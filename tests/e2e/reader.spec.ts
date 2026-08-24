@@ -4,6 +4,9 @@ test("seeded digest supports the critical reader journey", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "2026-08-24" })).toBeVisible();
+  const title = page.getByRole("heading", { name: "Seeded persisted story" });
+  await title.selectText();
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe("Seeded persisted story");
   await expect(page.locator("jelly-card")).toHaveCount(1);
   await expect(page.locator("jelly-breadcrumbs")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "閱讀原文" })).toBeVisible();

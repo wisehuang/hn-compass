@@ -25,4 +25,11 @@ describe("project configuration", () => {
     expect(styles).toContain("--jelly-color-border-focus");
     expect(reader).not.toMatch(/(?:orange|zinc)-/);
   });
+
+  it("keeps application text selectable despite JellyUI's component defaults", () => {
+    const styles = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
+
+    expect(styles).toContain("user-select: text");
+    expect(styles).toContain("-webkit-user-select: text");
+  });
 });

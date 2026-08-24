@@ -11,7 +11,7 @@ body {
   color: var(--jelly-color-foreground-default, #1f2430);
 }
 
-.app-shell { min-height: 100svh; background: var(--jelly-color-background-default, #ffffff); color: var(--jelly-color-foreground-default, #1f2430); }
+.app-shell { min-height: 100svh; background: var(--jelly-color-background-default, #ffffff); color: var(--jelly-color-foreground-default, #1f2430); -webkit-user-select: text; user-select: text; }
 .focus-ring:focus-visible { outline: 3px solid var(--jelly-color-border-focus, #0077cc); outline-offset: 3px; border-radius: 2px; }
 .reader-accent { color: var(--jelly-color-background-accent, #0077cc); }
 .reader-muted { color: var(--jelly-color-foreground-muted, #5d6474); }

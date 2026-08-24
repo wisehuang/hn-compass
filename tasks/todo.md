@@ -1,5 +1,15 @@
 # Kagi article summarization
 
+# Reader text selection
+
+- [x] Restore native text selection and copying for application content without changing JellyUI button interaction.
+- [x] Add regression coverage and run focused quality checks.
+
+## Review — Reader text selection
+
+- `.app-shell` explicitly restores native text selection, counteracting JellyUI's inherited component default while buttons retain their own non-selectable interaction surface.
+- Browser coverage selects a digest title and verifies the browser selection text; `pnpm test`, `npx tsc --noEmit`, `pnpm lint`, `pnpm test:e2e`, and `git diff --check` passed.
+
 # JellyUI reader actions
 
 - [x] Replace the digest reader's three text links with accessible JellyUI buttons while preserving their external/new-tab and internal navigation behavior.
