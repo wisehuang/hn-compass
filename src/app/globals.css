@@ -21,6 +21,8 @@ body {
 .reader-card {
   --jelly-card-padding-block: 0;
   --jelly-card-padding-inline: 0;
+  -webkit-user-select: text;
+  user-select: text;
   display: block;
   box-sizing: border-box;
   max-width: 100%;

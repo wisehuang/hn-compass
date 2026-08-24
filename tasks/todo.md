@@ -10,6 +10,16 @@
 - `.app-shell` explicitly restores native text selection, counteracting JellyUI's inherited component default while buttons retain their own non-selectable interaction surface.
 - Browser coverage selects a digest title and verifies the browser selection text; `pnpm test`, `npx tsc --noEmit`, `pnpm lint`, `pnpm test:e2e`, and `git diff --check` passed.
 
+# Correct reader text selection regression
+
+- [x] Verify the computed selection style on rendered card content and override the actual blocking JellyUI scope.
+- [x] Add regression coverage for user-select behavior and rerun browser verification.
+
+## Review — Correct reader text selection regression
+
+- JellyUI's `jelly-card` host, rather than only the surrounding theme, was the effective selection blocker; the reader card hosts now explicitly allow text selection.
+- Playwright now drags across rendered title text and confirms the browser creates a non-empty selection. `pnpm test`, `npx tsc --noEmit`, `pnpm lint`, `pnpm test:e2e`, `pnpm build`, and `git diff --check` passed.
+
 # JellyUI reader actions
 
 - [x] Replace the digest reader's three text links with accessible JellyUI buttons while preserving their external/new-tab and internal navigation behavior.

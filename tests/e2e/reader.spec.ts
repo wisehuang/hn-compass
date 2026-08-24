@@ -5,8 +5,14 @@ test("seeded digest supports the critical reader journey", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "2026-08-24" })).toBeVisible();
   const title = page.getByRole("heading", { name: "Seeded persisted story" });
-  await title.selectText();
-  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe("Seeded persisted story");
+  await expect.poll(() => title.evaluate((element) => getComputedStyle(element).userSelect)).toBe("text");
+  const titleBox = await title.boundingBox();
+  if (!titleBox) throw new Error("Expected a visible digest title");
+  await page.mouse.move(titleBox.x + 2, titleBox.y + titleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(titleBox.x + titleBox.width - 2, titleBox.y + titleBox.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).not.toBe("");
   await expect(page.locator("jelly-card")).toHaveCount(1);
   await expect(page.locator("jelly-breadcrumbs")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "閱讀原文" })).toBeVisible();
