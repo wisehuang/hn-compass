@@ -11,6 +11,9 @@ describe("persisted digest readers", () => {
     expect(html).toContain('href="/stories/story-1"');
     expect(html).toContain("閱讀原文（在新分頁開啟）");
     expect(html).toContain("focus-ring");
+    expect(html).toContain("jelly-card");
+    expect(html).toContain("jelly-badge");
+    expect(html).toContain("jelly-breadcrumbs");
   });
 
   it("renders unavailable material, provenance, comments, and safe external links", () => {
@@ -19,5 +22,7 @@ describe("persisted digest readers", () => {
     expect(html).toContain("Sanitized representative comment.");
     expect(html).toContain("test · v1");
     expect(html).toContain('rel="noreferrer"');
+    expect(html).toContain("jelly-card");
+    expect(html).toContain("jelly-breadcrumbs");
   });
 });

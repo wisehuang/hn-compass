@@ -7,11 +7,42 @@
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
-  background: var(--jelly-color-background, #fffdf8);
-  color: var(--jelly-color-foreground, #18181b);
+  background: var(--jelly-color-background-default, #ffffff);
+  color: var(--jelly-color-foreground-default, #1f2430);
 }
 
-.focus-ring:focus-visible { outline: 3px solid #ea580c; outline-offset: 3px; border-radius: 2px; }
+.app-shell { min-height: 100svh; background: var(--jelly-color-background-default, #ffffff); color: var(--jelly-color-foreground-default, #1f2430); }
+.focus-ring:focus-visible { outline: 3px solid var(--jelly-color-border-focus, #0077cc); outline-offset: 3px; border-radius: 2px; }
+.reader-accent { color: var(--jelly-color-background-accent, #0077cc); }
+.reader-muted { color: var(--jelly-color-foreground-muted, #5d6474); }
+.reader-divider { border-color: var(--jelly-color-border-default, #d9dde5); }
+.reader-comment { border-color: var(--jelly-color-background-accent, #0077cc); }
+.digest-card,
+.reader-card {
+  --jelly-card-padding-block: 0;
+  --jelly-card-padding-inline: 0;
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow: clip;
+}
+.digest-card:not(:defined) {
+  padding: 1.5rem;
+}
+.reader-card {
+  margin-top: 2.5rem;
+}
+.reader-card:not(:defined) {
+  padding: 1.5rem;
+}
+.digest-card > article,
+.reader-card > .reader-section {
+  padding: 1.5rem;
+}
+.reader-card .reader-section {
+  margin-top: 0;
+}
 .empty-state { max-width: 42rem; margin: 0 auto; padding: 5rem 1.5rem; }
 .empty-state h1 { font-size: 2.25rem; font-weight: 700; }
 .reader-section { margin-top: 2.5rem; line-height: 1.7; }

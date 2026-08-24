@@ -1,3 +1,16 @@
+# Fix JellyUI integration
+
+- [x] Confirm the official JellyUI module delivery contract and load it once from the root layout.
+- [x] Replace the reader's handwritten visual primitives with documented JellyUI grouping, metadata, and action primitives while preserving semantic HTML and accessible labels.
+- [x] Add resilient baseline styles and focused reader coverage, then run lint, type-check, unit, browser, and production-build verification.
+
+## Review — Fix JellyUI integration
+
+- JellyUI's official API confirms `jelly-theme`, `jelly-card`, `jelly-badge`, and `jelly-breadcrumbs`; native anchors remain anchors because `jelly-button` intentionally provides a native button rather than an `href` API.
+- The card's default internal 24px inline padding caused a 32px horizontal overflow at 320px. The reader now uses JellyUI's public card padding tokens with light-DOM padding, preserving the surface while preventing overflow.
+- `pnpm lint`, `pnpm test` (31 passed, 1 skipped), `npx tsc --noEmit`, direct Playwright reader journey (1 passed), and `pnpm build` passed.
+- Native reader colors now resolve through JellyUI background, foreground, muted-foreground, border, focus, and official `amber` accent tokens.
+
 # Tasks 4.1–4.4 — APIs and reader experience
 
 ## Tasks 5.1–5.3 — Delivery, documentation, and verification

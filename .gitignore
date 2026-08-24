@@ -241,4 +241,9 @@ dist
 .history
 .ionide
 
+# openspec
+openspec/
+
+.pnpm-store/
+
 # End of https://www.toptal.com/developers/gitignore/api/macos,node,nextjs,visualstudiocode,git
