@@ -6,7 +6,9 @@ test("seeded digest supports the critical reader journey", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "2026-08-24" })).toBeVisible();
   await expect(page.locator("jelly-card")).toHaveCount(1);
   await expect(page.locator("jelly-breadcrumbs")).toHaveCount(1);
-  await page.getByRole("link", { name: "Seeded persisted story" }).click();
+  await expect(page.getByRole("button", { name: "閱讀原文" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "查看 HN 討論" })).toBeVisible();
+  await page.getByRole("button", { name: "閱讀完整解析" }).click();
   await expect(page.getByRole("heading", { name: "Seeded persisted story" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "文章洞見" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "討論洞見" })).toBeVisible();

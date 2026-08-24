@@ -1,4 +1,5 @@
 import type { PublicDigest, PublicStory } from "@/server/queries/public-digest";
+import { JellyNavigationButton } from "@/components/jelly-navigation-button";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
@@ -30,7 +31,7 @@ export function DigestReader({ digest }: { digest: PublicDigest }) {
           <p className="reader-accent text-sm font-semibold"><jelly-badge variant="platinum" size="small">#{story.rank}</jelly-badge> {story.sourceDomain} · {story.comments.length} 則留言</p>
           <h2 className="mt-1 text-2xl font-semibold"><a className="focus-ring" href={`/stories/${story.id}`}>{story.title}</a></h2>
           <div className="mt-3"><SummaryPreview story={story} /></div>
-          <p className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium"><a className="focus-ring underline" href={story.articleUrl} target="_blank" rel="noreferrer">閱讀原文（在新分頁開啟）</a><a className="focus-ring underline" href={story.hnDiscussionUrl} target="_blank" rel="noreferrer">查看 HN 討論（在新分頁開啟）</a><a className="focus-ring underline" href={`/stories/${story.id}`}>閱讀完整解析</a></p>
+          <div className="mt-4 flex flex-wrap gap-2"><JellyNavigationButton href={story.articleUrl} newTab variant="azure">閱讀原文</JellyNavigationButton><JellyNavigationButton href={story.hnDiscussionUrl} newTab>查看 HN 討論</JellyNavigationButton><JellyNavigationButton href={`/stories/${story.id}`} variant="amber">閱讀完整解析</JellyNavigationButton></div>
         </article>
         </jelly-card>
       </li>)}

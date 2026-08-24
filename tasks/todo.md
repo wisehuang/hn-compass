@@ -1,5 +1,15 @@
 # Kagi article summarization
 
+# JellyUI reader actions
+
+- [x] Replace the digest reader's three text links with accessible JellyUI buttons while preserving their external/new-tab and internal navigation behavior.
+- [x] Add focused rendering and browser checks, then record the verification outcome.
+
+## Review — JellyUI reader actions
+
+- The digest card now presents 「閱讀原文」、「查看 HN 討論」and「閱讀完整解析」as compact square JellyUI buttons; external actions retain accessible new-tab labels and use `noopener,noreferrer`.
+- `pnpm test`, `npx tsc --noEmit`, `pnpm lint`, `pnpm test:e2e`, `pnpm build`, and `git diff --check` passed.
+
 - [x] Add a Kagi-only article adapter with strict response validation, 1MB request enforcement, Traditional Chinese output, and disabled provider caching.
 - [x] Keep OpenAI exclusively for structured, evidence-grounded HN discussion summaries and make each provider fail independently.
 - [x] Update persisted article rendering, environment templates, operations guidance, and focused tests for Kagi provenance and retryable failure behavior.

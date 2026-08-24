@@ -9,7 +9,10 @@ describe("persisted digest readers", () => {
   it("renders digest links, previews, and a keyboard-focusable detail path", () => {
     const html = renderToStaticMarkup(<DigestReader digest={{ id: "digest-1", digestDate: "2026-08-24", sourceRssUrl: "https://example.test/rss", stories: [story] } satisfies PublicDigest} />);
     expect(html).toContain('href="/stories/story-1"');
-    expect(html).toContain("閱讀原文（在新分頁開啟）");
+    expect(html).toContain("閱讀原文");
+    expect(html).toContain("查看 HN 討論");
+    expect(html).toContain("閱讀完整解析");
+    expect(html).toContain("jelly-button");
     expect(html).toContain("focus-ring");
     expect(html).toContain("jelly-card");
     expect(html).toContain("jelly-badge");
