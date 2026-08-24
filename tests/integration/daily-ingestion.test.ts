@@ -12,4 +12,17 @@ const config = { digestDate: "2026-08-24", rssUrl: "https://rss.test", openAiMod
 describe("daily ingestion", () => {
   it("is idempotent for the same date", async () => { const f = fixture(); await runDailyIngestionWith(f.store, config, f.deps); await runDailyIngestionWith(f.store, config, f.deps); expect(f.digests).toHaveLength(1); expect(f.stories).toHaveLength(1); expect(new Set(f.published)).toHaveLength(2); });
   it("persists independent stories when one story fails", async () => { const f = fixture(); const result = await runDailyIngestionWith(f.store, config, f.deps); expect(result).toMatchObject({ status: "PARTIAL_FAILURE", metrics: { storiesProcessed: 1, storyFailures: 1 } }); expect(f.stories).toHaveLength(1); expect(f.runs[0].status).toBe("PARTIAL_FAILURE"); });
+
+  it("keeps an OpenAI discussion summary when Kagi article work fails", async () => {
+    const f = fixture();
+    f.deps.createGenerator = () => ({
+      generateArticle: async () => { throw new Error("Kagi summarization failed."); },
+      generateDiscussion: async () => ({ payload: { overview: "discussion" }, inputHash: "discussion", model: "gpt-test", promptVersion: "v1" }),
+    });
+
+    const result = await runDailyIngestionWith(f.store, config, f.deps);
+
+    expect(result).toMatchObject({ status: "PARTIAL_FAILURE", metrics: { summaryFailures: 1, storiesProcessed: 1 } });
+    expect(f.published).toEqual(["story-1:DISCUSSION"]);
+  });
 });

@@ -4,16 +4,16 @@ import type { Database } from "@/db/repositories";
 import { savePublishedSummary, saveSummaryJob } from "@/db/repositories";
 import { stories } from "@/db/schema";
 import { runDailyIngestion } from "@/server/ingestion/daily";
-import { createSummaryGenerator } from "@/server/ingestion/summaries";
+import { createArticleSummaryGenerator, createDiscussionSummaryGenerator } from "@/server/ingestion/summaries";
 
 function taipeiDate() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 function configuration() {
-  const { RSS_URL: rssUrl, OPENAI_API_KEY: openAiApiKey, OPENAI_MODEL: openAiModel } = process.env;
-  if (!rssUrl || !openAiApiKey || !openAiModel) throw new Error("Internal operation is not configured.");
-  return { rssUrl, openAiApiKey, openAiModel };
+  const { RSS_URL: rssUrl, OPENAI_API_KEY: openAiApiKey, OPENAI_MODEL: openAiModel, KAGI_API_KEY: kagiApiKey, KAGI_SUMMARIZER_ENGINE: kagiSummarizerEngine } = process.env;
+  if (!rssUrl) throw new Error("Internal operation is not configured.");
+  return { rssUrl, openAiApiKey, openAiModel, kagiApiKey, kagiSummarizerEngine };
 }
 
 export async function ingestDaily(db: Database) {
@@ -26,10 +26,11 @@ export async function regenerateStorySummaries(db: Database, storyId: string) {
   const story = await db.query.stories.findFirst({ where: eq(stories.id, storyId), with: { comments: true } });
   if (!story) return { regenerated: false, reason: "not_found" };
   const config = configuration();
-  const generator = createSummaryGenerator({ client: new OpenAI({ apiKey: config.openAiApiKey }), model: config.openAiModel });
+  const articleGenerator = config.kagiApiKey && config.kagiSummarizerEngine ? createArticleSummaryGenerator({ apiKey: config.kagiApiKey, engine: config.kagiSummarizerEngine }) : undefined;
+  const discussionGenerator = config.openAiApiKey && config.openAiModel ? createDiscussionSummaryGenerator({ client: new OpenAI({ apiKey: config.openAiApiKey }), model: config.openAiModel }) : undefined;
   const jobs = [
-    ...(story.articleContent ? [{ kind: "ARTICLE", generate: () => generator.generateArticle(story.articleContent!) }] : []),
-    { kind: "DISCUSSION", generate: () => generator.generateDiscussion(story.comments.map(({ hnCommentId, bodyText }) => ({ hnCommentId, bodyText }))) },
+    ...(story.articleContent ? [{ kind: "ARTICLE", generate: () => articleGenerator ? articleGenerator.generateArticle(story.articleContent!) : Promise.reject(new Error("Kagi article summarizer is not configured.")) }] : []),
+    { kind: "DISCUSSION", generate: () => discussionGenerator ? discussionGenerator.generateDiscussion(story.comments.map(({ hnCommentId, bodyText }) => ({ hnCommentId, bodyText }))) : Promise.reject(new Error("OpenAI discussion summarizer is not configured.")) },
   ];
   const results = await Promise.all(jobs.map(async (job) => {
     try {

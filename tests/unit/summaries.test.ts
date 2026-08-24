@@ -1,9 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { ArticleSummarySchema, DiscussionSummarySchema, validateDiscussionSummary } from "@/server/ingestion/summaries";
+import { ArticleSummarySchema, createArticleSummaryGenerator, DiscussionSummarySchema, validateDiscussionSummary } from "@/server/ingestion/summaries";
 
 describe("summary schemas", () => {
-  it("rejects malformed article payloads", () => {
-    expect(ArticleSummarySchema.safeParse({ tldr: "摘要", keyPoints: [], caveats: [], readerValue: "價值" }).success).toBe(false);
+  it("accepts Kagi article output without fabricating structured fields", () => {
+    expect(ArticleSummarySchema.safeParse({ summary: "本文說明安全取得資料的邊界。", tokens: 240, targetLanguage: "ZH-HANT" }).success).toBe(true);
+  });
+
+  it("rejects retired fabricated article fields", () => {
+    expect(ArticleSummarySchema.safeParse({ tldr: "摘要", keyPoints: [], caveats: [], readerValue: "價值", sourceLanguage: "EN" }).success).toBe(false);
+  });
+
+  it("records Kagi engine provenance for faithful article output", async () => {
+    const generator = createArticleSummaryGenerator({
+      apiKey: "kagi-test",
+      engine: "agnes",
+      fetchFn: async () => new Response(JSON.stringify({ data: { output: "本文說明安全取得資料的邊界。", tokens: 240 } }), { status: 200 }),
+    });
+
+    await expect(generator.generateArticle("clean article text")).resolves.toMatchObject({
+      payload: { summary: "本文說明安全取得資料的邊界。", tokens: 240, targetLanguage: "ZH-HANT" },
+      model: "kagi:agnes",
+      promptVersion: "kagi-v1",
+    });
   });
 
   it("rejects discussion viewpoints that cite comments not persisted for the story", () => {

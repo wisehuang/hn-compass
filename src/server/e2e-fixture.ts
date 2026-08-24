@@ -11,7 +11,7 @@ const story: PublicStory = {
   articleFetchStatus: "SUCCESS",
   comments: [{ hnCommentId: 1, parentHnCommentId: null, author: "reader", score: 1, bodyText: "A persisted representative comment.", position: 0 }],
   summaries: [
-    { kind: "ARTICLE", payloadJson: { tldr: "已保存的文章摘要。", keyPoints: ["文章重點。"], caveats: [], readerValue: "讀者價值。" }, model: "fixture-model", promptVersion: "v1", generatedAt: new Date("2026-08-24") },
+    { kind: "ARTICLE", payloadJson: { summary: "已保存的 Kagi 文章摘要。", tokens: 240, targetLanguage: "ZH-HANT" }, model: "kagi:agnes", promptVersion: "kagi-v1", generatedAt: new Date("2026-08-24") },
     { kind: "DISCUSSION", payloadJson: { overview: "已保存的討論摘要。", consensus: "先驗證假設。", practicalTakeaways: ["驗證假設。"], unresolvedQuestions: [] }, model: "fixture-model", promptVersion: "v1", generatedAt: new Date("2026-08-24") },
   ],
 };

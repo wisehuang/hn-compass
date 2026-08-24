@@ -4,10 +4,10 @@ import { finishIngestionRun, replaceStoryComments, savePublishedSummary, saveSum
 import { resolveArticleMaterial, type ArticleMaterial } from "@/server/ingestion/article-material";
 import { collectHnComments, type CollectedHnComment } from "@/server/ingestion/hn-comments";
 import { parseDailyRss } from "@/server/ingestion/rss";
-import { createSummaryGenerator } from "@/server/ingestion/summaries";
+import { createArticleSummaryGenerator, createDiscussionSummaryGenerator } from "@/server/ingestion/summaries";
 
 type Database = ReturnType<typeof createDatabase>["db"];
-export type DailyConfig = { digestDate: string; rssUrl: string; openAiModel: string; openAiApiKey: string };
+export type DailyConfig = { digestDate: string; rssUrl: string; openAiModel?: string; openAiApiKey?: string; kagiApiKey?: string; kagiSummarizerEngine?: string };
 type Generated = { payload: unknown; inputHash: string; model: string; promptVersion: string };
 type Generator = { generateArticle: (text: string) => Promise<Generated>; generateDiscussion: (comments: Array<{ hnCommentId: number; bodyText: string }>) => Promise<Generated> };
 export type DailyStore = {
@@ -41,5 +41,17 @@ export async function runDailyIngestionWith(store: DailyStore, config: DailyConf
 
 export async function runDailyIngestion(db: Database, config: DailyConfig) {
   const store: DailyStore = { startRun: (date) => startIngestionRun(db, date), finishRun: (id, status, metrics, error) => finishIngestionRun(db, id, status, metrics, error), upsertDigest: (date, url) => upsertDigest(db, date, url), upsertStory: (values) => upsertStory(db, values), replaceComments: (id, values) => replaceStoryComments(db, id, values), savePublished: (values) => savePublishedSummary(db, values), saveFailure: (id, kind, error) => saveSummaryJob(db, { storyId: id, kind, status: "RETRYABLE_FAILURE", errorSummary: error }) };
-  return runDailyIngestionWith(store, config, { fetchRss, resolveArticle: resolveArticleMaterial, collectComments: collectHnComments, createGenerator: () => createSummaryGenerator({ client: new OpenAI({ apiKey: config.openAiApiKey }), model: config.openAiModel }) });
+  return runDailyIngestionWith(store, config, {
+    fetchRss,
+    resolveArticle: resolveArticleMaterial,
+    collectComments: collectHnComments,
+    createGenerator: () => ({
+      generateArticle: config.kagiApiKey && config.kagiSummarizerEngine
+        ? createArticleSummaryGenerator({ apiKey: config.kagiApiKey, engine: config.kagiSummarizerEngine }).generateArticle
+        : async () => { throw new Error("Kagi article summarizer is not configured."); },
+      generateDiscussion: config.openAiApiKey && config.openAiModel
+        ? createDiscussionSummaryGenerator({ client: new OpenAI({ apiKey: config.openAiApiKey }), model: config.openAiModel }).generateDiscussion
+        : async () => { throw new Error("OpenAI discussion summarizer is not configured."); },
+    }),
+  });
 }

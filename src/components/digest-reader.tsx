@@ -8,10 +8,10 @@ const jellyCardStyle = {
 } as CSSProperties;
 
 function SummaryPreview({ story }: { story: PublicStory }) {
-  const article = story.summaries.find((summary) => summary.kind === "ARTICLE")?.payloadJson as { tldr?: string } | undefined;
+  const article = story.summaries.find((summary) => summary.kind === "ARTICLE")?.payloadJson as { summary?: string } | undefined;
   const discussion = story.summaries.find((summary) => summary.kind === "DISCUSSION")?.payloadJson as { overview?: string } | undefined;
   return <div className="reader-muted space-y-2 text-sm leading-6">
-    <p><strong>文章重點：</strong>{article?.tldr ?? "原文內容目前無法安全取得。"}</p>
+    <p><strong>文章重點：</strong>{article?.summary ?? "原文內容目前無法安全取得。"}</p>
     <p><strong>社群討論：</strong>{discussion?.overview ?? "尚無可用的討論摘要。"}</p>
   </div>;
 }
@@ -41,12 +41,12 @@ export function DigestReader({ digest }: { digest: PublicDigest }) {
 export function StoryReader({ story }: { story: PublicStory }) {
   const article = story.summaries.find((summary) => summary.kind === "ARTICLE");
   const discussion = story.summaries.find((summary) => summary.kind === "DISCUSSION");
-  const articlePayload = article?.payloadJson as { tldr?: string; keyPoints?: string[]; caveats?: string[]; readerValue?: string } | undefined;
+  const articlePayload = article?.payloadJson as { summary?: string; tokens?: number; targetLanguage?: "ZH-HANT" } | undefined;
   const discussionPayload = discussion?.payloadJson as { overview?: string; consensus?: string | null; practicalTakeaways?: string[]; unresolvedQuestions?: string[] } | undefined;
   return <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
     <jelly-breadcrumbs size="small" aria-label="頁面導覽"><Link className="focus-ring" href="/">← 回到最新日報</Link><span>完整解析</span></jelly-breadcrumbs>
     <header className="reader-divider mt-7 border-b pb-7"><p className="reader-accent text-sm font-semibold"><jelly-badge variant="platinum" size="small">#{story.rank}</jelly-badge> {story.sourceDomain}</p><h1 className="mt-2 text-4xl font-bold tracking-tight">{story.title}</h1><p className="mt-4 flex flex-wrap gap-4 text-sm"><a className="focus-ring underline" href={story.articleUrl} target="_blank" rel="noreferrer">原文連結（在新分頁開啟）</a><a className="focus-ring underline" href={story.hnDiscussionUrl} target="_blank" rel="noreferrer">HN 討論（在新分頁開啟）</a></p></header>
-    <jelly-card className="reader-card" style={jellyCardStyle}><section className="reader-section"><h2>文章洞見</h2>{articlePayload ? <><p>{articlePayload.tldr}</p><List items={articlePayload.keyPoints} /><p>{articlePayload.readerValue}</p><List items={articlePayload.caveats} label="注意事項" /></> : <p role="status">原文內容目前無法安全取得，因此未產生文章摘要。</p>}</section></jelly-card>
+    <jelly-card className="reader-card" style={jellyCardStyle}><section className="reader-section"><h2>文章洞見</h2>{articlePayload?.summary ? <p>{articlePayload.summary}</p> : <p role="status">原文內容目前無法安全取得，因此未產生文章摘要。</p>}</section></jelly-card>
     <jelly-card className="reader-card" style={jellyCardStyle}><section className="reader-section"><h2>討論洞見</h2>{discussionPayload ? <><p>{discussionPayload.overview}</p><p><strong>共識：</strong>{discussionPayload.consensus ?? "證據不足或意見分歧，未下定論。"}</p><List items={discussionPayload.practicalTakeaways} label="實務建議" /><List items={discussionPayload.unresolvedQuestions} label="待釐清問題" /></> : <p role="status">尚無可用的討論摘要。</p>}</section></jelly-card>
     <jelly-card className="reader-card" style={jellyCardStyle}><section className="reader-section"><h2>代表性留言</h2><ol className="space-y-4">{story.comments.map((comment) => <li key={comment.hnCommentId} className="reader-comment border-s-2 ps-4"><p>{comment.bodyText}</p><p className="reader-muted mt-1 text-sm">{comment.author ?? "匿名"} · HN #{comment.hnCommentId}</p></li>)}</ol></section></jelly-card>
     <footer className="reader-muted reader-section text-sm"><p>本頁摘要由 AI 生成，請回到原始來源核對脈絡。</p>{[article, discussion].filter(Boolean).map((summary) => <p key={summary!.kind}>{summary!.kind}：{summary!.model} · {summary!.promptVersion} · {summary!.generatedAt.toLocaleDateString("zh-TW")}</p>)}</footer>

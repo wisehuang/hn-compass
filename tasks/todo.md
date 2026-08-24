@@ -1,3 +1,16 @@
+# Kagi article summarization
+
+- [x] Add a Kagi-only article adapter with strict response validation, 1MB request enforcement, Traditional Chinese output, and disabled provider caching.
+- [x] Keep OpenAI exclusively for structured, evidence-grounded HN discussion summaries and make each provider fail independently.
+- [x] Update persisted article rendering, environment templates, operations guidance, and focused tests for Kagi provenance and retryable failure behavior.
+
+## Review — Kagi article summarization
+
+- Kagi receives only `articleSummaryInput` (the existing sanitized text), with a 1,000,000-byte guard and provider caching disabled; raw article URLs and HTML never cross the provider boundary.
+- ARTICLE summaries persist Kagi's faithful Traditional Chinese output, token count, engine provenance, and exact-input hash; OpenAI remains limited to evidence-grounded DISCUSSION summaries.
+- Provider configuration failures and Kagi failures persist retryable ARTICLE work without preventing independent DISCUSSION work.
+- `pnpm test` (40 passed, 1 skipped), `pnpm test:e2e` (1 passed), `npx tsc --noEmit`, `pnpm lint`, `pnpm build`, and `git diff --check` passed.
+
 # Fix JellyUI integration
 
 - [x] Confirm the official JellyUI module delivery contract and load it once from the root layout.

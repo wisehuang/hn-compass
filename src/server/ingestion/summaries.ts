@@ -3,16 +3,15 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import pLimit from "p-limit";
 import { z } from "zod";
+import { createKagiArticleSummarizer } from "@/server/ingestion/kagi-summarizer";
 
 const text = z.string().trim().min(1);
 const viewpoint = z.object({ claim: text, commentIds: z.array(z.number().int().positive()).min(1) }).strict();
 
 export const ArticleSummarySchema = z.object({
-  tldr: text,
-  keyPoints: z.array(text),
-  caveats: z.array(text),
-  readerValue: text,
-  sourceLanguage: text,
+  summary: text,
+  tokens: z.number().int().positive(),
+  targetLanguage: z.literal("ZH-HANT"),
 }).strict();
 
 export const DiscussionSummarySchema = z.object({
@@ -29,7 +28,8 @@ export type DiscussionSummary = z.infer<typeof DiscussionSummarySchema>;
 export type GeneratedSummary<T> = { payload: T; inputHash: string; model: string; promptVersion: string };
 
 type ParsedResponsesClient = Pick<OpenAI, "responses">;
-type SummaryGeneratorOptions = { client: ParsedResponsesClient; model: string; promptVersion?: string };
+type DiscussionSummaryGeneratorOptions = { client: ParsedResponsesClient; model: string; promptVersion?: string };
+type ArticleSummaryGeneratorOptions = { apiKey: string; engine: string; promptVersion?: string; fetchFn?: typeof fetch };
 
 export function validateDiscussionSummary(payload: unknown, persistedCommentIds: ReadonlySet<number>) {
   const parsed = DiscussionSummarySchema.safeParse(payload);
@@ -45,7 +45,17 @@ function quotedUntrusted(label: string, content: string): string {
   return `BEGIN UNTRUSTED ${label}\n${content}\nEND UNTRUSTED ${label}`;
 }
 
-export function createSummaryGenerator({ client, model, promptVersion = "v1" }: SummaryGeneratorOptions) {
+export function createArticleSummaryGenerator({ apiKey, engine, promptVersion = "kagi-v1", fetchFn }: ArticleSummaryGeneratorOptions) {
+  const summarize = createKagiArticleSummarizer({ apiKey, engine, fetchFn });
+  return {
+    async generateArticle(articleText: string): Promise<GeneratedSummary<ArticleSummary>> {
+      const payload = ArticleSummarySchema.parse(await summarize(articleText));
+      return { payload, inputHash: createHash("sha256").update(articleText).digest("hex"), model: `kagi:${engine}`, promptVersion };
+    },
+  };
+}
+
+export function createDiscussionSummaryGenerator({ client, model, promptVersion = "v1" }: DiscussionSummaryGeneratorOptions) {
   const limit = pLimit(2);
   async function parse<T>(schema: z.ZodType<T>, name: string, instructions: string, source: string): Promise<GeneratedSummary<T>> {
     const response = await limit(() => client.responses.parse({
@@ -62,7 +72,6 @@ export function createSummaryGenerator({ client, model, promptVersion = "v1" }: 
   }
 
   return {
-    generateArticle: (articleText: string) => parse(ArticleSummarySchema, "article_summary", "Summarize this article into tldr, key points, caveats, reader value, and source language.", articleText),
     async generateDiscussion(comments: Array<{ hnCommentId: number; bodyText: string }>) {
       const source = comments.map((comment) => `[comment:${comment.hnCommentId}] ${comment.bodyText}`).join("\n");
       const generated = await parse(DiscussionSummarySchema, "discussion_summary", "Summarize evidence-grounded discussion. Cite only supplied comment IDs. Use null consensus when evidence is sparse or materially mixed.", source);

@@ -25,4 +25,13 @@ describe("persisted digest readers", () => {
     expect(html).toContain("jelly-card");
     expect(html).toContain("jelly-breadcrumbs");
   });
+
+  it("renders the faithful Kagi article summary without retired synthetic sections", () => {
+    const kagiStory: PublicStory = { ...story, articleFetchStatus: "SUCCESS", summaries: [{ kind: "ARTICLE", payloadJson: { summary: "Kagi 文章摘要。", tokens: 240, targetLanguage: "ZH-HANT" }, model: "kagi:agnes", promptVersion: "kagi-v1", generatedAt: new Date("2026-08-24") }] };
+    const html = renderToStaticMarkup(<StoryReader story={kagiStory} />);
+
+    expect(html).toContain("Kagi 文章摘要。");
+    expect(html).toContain("kagi:agnes · kagi-v1");
+    expect(html).not.toContain("讀者價值");
+  });
 });
