@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.git
+.next
+node_modules
+playwright-report
+test-results
+coverage
+tsconfig.tsbuildinfo
+openspec
+.spectra
+tasks
+docs
+README.md
+*.log
