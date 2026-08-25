@@ -8,8 +8,8 @@ const KagiResponseSchema = z.object({
   data: z.object({
     output: z.string().trim().min(1),
     tokens: z.number().int().positive(),
-  }).strict(),
-}).strict();
+  }),
+});
 
 export type KagiArticleSummary = {
   summary: string;

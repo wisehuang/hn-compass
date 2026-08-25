@@ -14,6 +14,18 @@ describe("Kagi article summarizer", () => {
     }));
   });
 
+  it("accepts Kagi's successful URL response with additional metadata", async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({
+      meta: { id: "75f56c3ffa94376e1844b4e3fe100bb0", node: "asia-southeast1", ms: 6809, api_balance: 4.688812 },
+      data: { output: "Kagi 直接摘要文章網址。", tokens: 2611, title: "什麼是安全帶？ | EARENDIL", authors: null },
+    }), { status: 200 }));
+    const summarize = createKagiArticleSummarizer({ apiKey: "kagi-test", engine: "agnes", fetchFn });
+
+    await expect(summarize({ url: "https://earendil.com/posts/what-is-a-harness/" })).resolves.toEqual({
+      summary: "Kagi 直接摘要文章網址。", tokens: 2611, targetLanguage: "ZH-HANT",
+    });
+  });
+
   it("rejects non-success and malformed provider responses", async () => {
     const failing = createKagiArticleSummarizer({ apiKey: "kagi-test", engine: "agnes", fetchFn: async () => new Response("insufficient credits", { status: 402 }) });
     const malformed = createKagiArticleSummarizer({ apiKey: "kagi-test", engine: "agnes", fetchFn: async () => new Response(JSON.stringify({ data: { output: "", tokens: 0 } }), { status: 200 }) });

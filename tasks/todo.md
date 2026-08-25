@@ -1,5 +1,17 @@
 # Kagi article summarization
 
+# Accept Kagi URL summarizer response metadata
+
+- [x] Add a regression fixture for Kagi's successful URL response, including its `meta`, `title`, and `authors` fields.
+- [x] Persist the required article summary fields from that response without rejecting Kagi's extra metadata.
+- [x] Run focused and project verification; document the observed root cause and result.
+
+## Review — Accept Kagi URL summarizer response metadata
+
+- Root cause: the Kagi response validator rejected Kagi's successful URL response because its strict schemas did not allow the documented response metadata and optional `data` fields.
+- The validator now preserves strict validation of the required `data.output` and `data.tokens` values while ignoring response fields that the application does not persist.
+- Regression coverage uses the observed successful response shape. `pnpm vitest run tests/unit/kagi-summarizer.test.ts`, `pnpm test` (45 passed, 1 skipped), `npx tsc --noEmit`, `pnpm lint`, `pnpm build`, and `git diff --check` passed.
+
 # Fix missing Kagi article highlights
 
 - [x] Reproduce the missing article-summary state and isolate whether extraction, summary generation, or rendering diverges.
