@@ -1,5 +1,16 @@
 # Kagi article summarization
 
+# Add application favicon assets
+
+- [x] Inspect the supplied `favicon_io` set and map each asset to Next.js 16 file-based metadata conventions.
+- [x] Install the selected favicon, app icons, and web manifest under `src/app` without altering the supplied source set.
+- [x] Verify the production build emits the correct icon and manifest links; record the result.
+
+## Review — Add application favicon assets
+
+- The supplied SofaDog Today favicon set maps to Next.js file-based metadata: `src/app/favicon.ico`, `icon.png`, `apple-icon.png`, and `manifest.webmanifest`; manifest-specific Android icons are served from `public/`.
+- `pnpm build` passed and emitted all four metadata routes. A production-server check confirmed the generated `<head>` contains the manifest, ICO, PNG, and Apple touch links; all six icon/manifest URLs return `200` with their expected content types.
+
 # Prevent premature Kagi URL summary failures
 
 - [x] Add regression coverage for Kagi's non-success response diagnostics and the provider timeout budget.
