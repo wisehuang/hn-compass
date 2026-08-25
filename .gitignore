@@ -1,5 +1,6 @@
 .spectra/
 openspec/.vector-search.db*
+tasks/
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,node,nextjs,visualstudiocode,git
 # Edit at https://www.toptal.com/developers/gitignore?templates=macos,node,nextjs,visualstudiocode,git
