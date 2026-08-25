@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `DATABASE_URL` | Web, migration, Cron | Railway private PostgreSQL connection URL |
 | `RSS_URL` | Cron, internal ingestion | Daemonology HN Daily RSS URL |
-| `KAGI_API_KEY` | Cron, summary regeneration | Server-only Kagi Universal Summarizer credential for sanitized article text |
+| `KAGI_API_KEY` | Cron, summary regeneration | Server-only Kagi Universal Summarizer credential for article URLs |
 | `KAGI_SUMMARIZER_ENGINE` | Cron, summary regeneration | Kagi engine, such as `agnes` |
 | `OPENAI_API_KEY` | Cron, summary regeneration | Server-only OpenAI credential for evidence-grounded discussion summaries |
 | `OPENAI_MODEL` | Cron, summary regeneration | OpenAI structured-output model for discussion summaries |
@@ -51,7 +51,7 @@ After the first migration, manually run the Cron service once. Check its JSON lo
 
 - A `PARTIAL_FAILURE` run preserves successfully ingested stories. Re-run the Cron service (or `pnpm ingest:daily`) to retry the same Taipei date safely; unique keys make it idempotent.
 - A `FAILED` run records a safe error summary and metrics. Inspect Railway Cron logs, confirm the database, RSS, Kagi, and OpenAI variables plus outbound network access, then re-run once after correction.
-- Kagi article requests send pre-sanitized text with provider caching disabled. Kagi bills prepaid API credits; if credits are exhausted, ARTICLE summary work remains retryable while independent DISCUSSION work can persist. Restore the previous application release and its article provider configuration to roll back.
+- Kagi article requests send the published article URL with provider caching disabled, allowing Kagi to retrieve pages that local extraction cannot parse. Kagi bills prepaid API credits; if credits are exhausted, ARTICLE summary work remains retryable while independent DISCUSSION work can persist. Restore the previous application release and its article provider configuration to roll back.
 - Enable Railway PostgreSQL backups according to the selected plan and periodically test a restore into a separate project. Do not use a public database URL as a substitute for backups.
 - Roll back a bad Web/Cron image in Railway. Keep migrations backward compatible; restore PostgreSQL only for actual data loss, not an application rollback.
 

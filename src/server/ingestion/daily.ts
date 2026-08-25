@@ -9,7 +9,7 @@ import { createArticleSummaryGenerator, createDiscussionSummaryGenerator } from 
 type Database = ReturnType<typeof createDatabase>["db"];
 export type DailyConfig = { digestDate: string; rssUrl: string; openAiModel?: string; openAiApiKey?: string; kagiApiKey?: string; kagiSummarizerEngine?: string };
 type Generated = { payload: unknown; inputHash: string; model: string; promptVersion: string };
-type Generator = { generateArticle: (text: string) => Promise<Generated>; generateDiscussion: (comments: Array<{ hnCommentId: number; bodyText: string }>) => Promise<Generated> };
+type Generator = { generateArticleFromUrl: (url: string) => Promise<Generated>; generateDiscussion: (comments: Array<{ hnCommentId: number; bodyText: string }>) => Promise<Generated> };
 export type DailyStore = {
   startRun(date: string): Promise<{ id: string }>; finishRun(id: string, status: "COMPLETED" | "PARTIAL_FAILURE" | "FAILED", metrics: Record<string, number>, error?: string): Promise<void>; upsertDigest(date: string, url: string): Promise<{ id: string }>;
   upsertStory(values: { digestId: string; rank: number; title: string; articleUrl: string; sourceDomain: string; hnItemId: number; hnDiscussionUrl: string; articleFetchStatus: string; articleContent: string | null; articleContentHash: string | null }): Promise<{ id: string }>;
@@ -30,7 +30,7 @@ export async function runDailyIngestionWith(store: DailyStore, config: DailyConf
         const material = await dependencies.resolveArticle(entry.articleUrl);
         const story = await store.upsertStory({ digestId: digest.id, rank: entry.rank, title: entry.title, articleUrl: entry.articleUrl, sourceDomain: new URL(entry.articleUrl).hostname, hnItemId: entry.hnItemId, hnDiscussionUrl: entry.hnDiscussionUrl, articleFetchStatus: material.articleFetchStatus, articleContent: material.articleContent, articleContentHash: material.articleContentHash });
         const collected = await dependencies.collectComments(entry.hnItemId); await store.replaceComments(story.id, collected.comments);
-        const jobs: Array<{ kind: string; run: () => Promise<Generated> }> = [{ kind: "DISCUSSION", run: () => generator.generateDiscussion(collected.comments) }]; if (material.articleSummaryInput) jobs.push({ kind: "ARTICLE", run: () => generator.generateArticle(material.articleSummaryInput!) });
+        const jobs: Array<{ kind: string; run: () => Promise<Generated> }> = [{ kind: "DISCUSSION", run: () => generator.generateDiscussion(collected.comments) }, { kind: "ARTICLE", run: () => generator.generateArticleFromUrl(entry.articleUrl) }];
         await Promise.all(jobs.map(async (job) => { try { const output = await job.run(); await store.savePublished({ storyId: story.id, kind: job.kind, payloadJson: output.payload, model: output.model, promptVersion: output.promptVersion, inputHash: output.inputHash }); } catch (error) { metrics.summaryFailures += 1; await store.saveFailure(story.id, job.kind, safeError(error)); } }));
         metrics.storiesProcessed += 1;
       } catch { metrics.storyFailures += 1; }
@@ -45,13 +45,13 @@ export async function runDailyIngestion(db: Database, config: DailyConfig) {
     fetchRss,
     resolveArticle: resolveArticleMaterial,
     collectComments: collectHnComments,
-    createGenerator: () => ({
-      generateArticle: config.kagiApiKey && config.kagiSummarizerEngine
-        ? createArticleSummaryGenerator({ apiKey: config.kagiApiKey, engine: config.kagiSummarizerEngine }).generateArticle
-        : async () => { throw new Error("Kagi article summarizer is not configured."); },
-      generateDiscussion: config.openAiApiKey && config.openAiModel
-        ? createDiscussionSummaryGenerator({ client: new OpenAI({ apiKey: config.openAiApiKey }), model: config.openAiModel }).generateDiscussion
-        : async () => { throw new Error("OpenAI discussion summarizer is not configured."); },
-    }),
+    createGenerator: () => {
+      const articleGenerator = config.kagiApiKey && config.kagiSummarizerEngine ? createArticleSummaryGenerator({ apiKey: config.kagiApiKey, engine: config.kagiSummarizerEngine }) : undefined;
+      const discussionGenerator = config.openAiApiKey && config.openAiModel ? createDiscussionSummaryGenerator({ client: new OpenAI({ apiKey: config.openAiApiKey }), model: config.openAiModel }) : undefined;
+      return {
+        generateArticleFromUrl: (url) => articleGenerator ? articleGenerator.generateArticleFromUrl(url) : Promise.reject(new Error("Kagi article summarizer is not configured.")),
+        generateDiscussion: (comments) => discussionGenerator ? discussionGenerator.generateDiscussion(comments) : Promise.reject(new Error("OpenAI discussion summarizer is not configured.")),
+      };
+    },
   });
 }

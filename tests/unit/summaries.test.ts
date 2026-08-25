@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ArticleSummarySchema, createArticleSummaryGenerator, DiscussionSummarySchema, validateDiscussionSummary } from "@/server/ingestion/summaries";
 
 describe("summary schemas", () => {
@@ -22,6 +22,17 @@ describe("summary schemas", () => {
       model: "kagi:agnes",
       promptVersion: "kagi-v1",
     });
+  });
+
+  it("asks Kagi to summarize the public article URL when local extraction is unavailable", async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: { output: "Kagi 直接摘要文章網址。", tokens: 120 } }), { status: 200 }));
+    const generator = createArticleSummaryGenerator({ apiKey: "kagi-test", engine: "agnes", fetchFn });
+    const generateArticleFromUrl = (generator as { generateArticleFromUrl?: (url: string) => Promise<unknown> }).generateArticleFromUrl;
+
+    await expect(generateArticleFromUrl?.("https://example.test/article")).resolves.toMatchObject({
+      payload: { summary: "Kagi 直接摘要文章網址。", tokens: 120, targetLanguage: "ZH-HANT" },
+    });
+    expect(JSON.parse(String(fetchFn.mock.calls[0][1]?.body))).toMatchObject({ url: "https://example.test/article", engine: "agnes", cache: false });
   });
 
   it("rejects discussion viewpoints that cite comments not persisted for the story", () => {

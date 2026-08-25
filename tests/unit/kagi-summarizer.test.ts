@@ -29,4 +29,12 @@ describe("Kagi article summarizer", () => {
     await expect(summarize("a".repeat(KAGI_MAX_TEXT_BYTES + 1))).rejects.toThrow("Kagi article text exceeds the 1 MB request limit");
     expect(fetchFn).not.toHaveBeenCalled();
   });
+
+  it("does not send a non-HTTP article URL to Kagi", async () => {
+    const fetchFn = vi.fn<typeof fetch>();
+    const summarize = createKagiArticleSummarizer({ apiKey: "kagi-test", engine: "agnes", fetchFn });
+
+    await expect(summarize({ url: "file:///private/article" })).rejects.toThrow("Kagi article URL must use HTTP or HTTPS.");
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
 });

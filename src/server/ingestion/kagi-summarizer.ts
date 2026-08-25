@@ -17,14 +17,25 @@ export type KagiArticleSummary = {
   targetLanguage: "ZH-HANT";
 };
 
+export type KagiSummarizerInput = string | { text: string } | { url: string };
+
 type KagiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type KagiArticleSummarizerOptions = { apiKey: string; engine: string; fetchFn?: KagiFetch };
 
 export function createKagiArticleSummarizer({ apiKey, engine, fetchFn = fetch }: KagiArticleSummarizerOptions) {
   if (!apiKey.trim() || !engine.trim()) throw new Error("Kagi summarizer is not configured.");
 
-  return async function summarize(articleText: string): Promise<KagiArticleSummary> {
-    if (Buffer.byteLength(articleText, "utf8") > KAGI_MAX_TEXT_BYTES) {
+  return async function summarize(input: KagiSummarizerInput): Promise<KagiArticleSummary> {
+    const request = typeof input === "string" ? { text: input } : input;
+    if ("url" in request) {
+      try {
+        const url = new URL(request.url);
+        if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error();
+      } catch {
+        throw new Error("Kagi article URL must use HTTP or HTTPS.");
+      }
+    }
+    if ("text" in request && Buffer.byteLength(request.text, "utf8") > KAGI_MAX_TEXT_BYTES) {
       throw new Error("Kagi article text exceeds the 1 MB request limit.");
     }
 
@@ -33,7 +44,7 @@ export function createKagiArticleSummarizer({ apiKey, engine, fetchFn = fetch }:
       response = await fetchFn(KAGI_SUMMARIZE_URL, {
         method: "POST",
         headers: { Authorization: `Bot ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ text: articleText, engine, summary_type: "summary", target_language: "ZH-HANT", cache: false }),
+        body: JSON.stringify({ ...request, engine, summary_type: "summary", target_language: "ZH-HANT", cache: false }),
         signal: AbortSignal.timeout(KAGI_TIMEOUT_MS),
       });
     } catch {

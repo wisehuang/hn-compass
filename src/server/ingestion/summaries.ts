@@ -49,8 +49,12 @@ export function createArticleSummaryGenerator({ apiKey, engine, promptVersion = 
   const summarize = createKagiArticleSummarizer({ apiKey, engine, fetchFn });
   return {
     async generateArticle(articleText: string): Promise<GeneratedSummary<ArticleSummary>> {
-      const payload = ArticleSummarySchema.parse(await summarize(articleText));
+      const payload = ArticleSummarySchema.parse(await summarize({ text: articleText }));
       return { payload, inputHash: createHash("sha256").update(articleText).digest("hex"), model: `kagi:${engine}`, promptVersion };
+    },
+    async generateArticleFromUrl(articleUrl: string): Promise<GeneratedSummary<ArticleSummary>> {
+      const payload = ArticleSummarySchema.parse(await summarize({ url: articleUrl }));
+      return { payload, inputHash: createHash("sha256").update(articleUrl).digest("hex"), model: `kagi:${engine}`, promptVersion };
     },
   };
 }

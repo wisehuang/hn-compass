@@ -1,5 +1,17 @@
 # Kagi article summarization
 
+# Fix missing Kagi article highlights
+
+- [x] Reproduce the missing article-summary state and isolate whether extraction, summary generation, or rendering diverges.
+- [x] Add a regression test and fix the responsible ingestion/regeneration boundary so Kagi summaries persist for safely retrievable articles.
+- [x] Run focused and project verification; document the root cause and outcome.
+
+## Review — Fix missing Kagi article highlights
+
+- Root cause: ARTICLE work was conditioned on local text extraction, so pages blocked by dynamic rendering or anti-bot measures never reached Kagi and readers fell back to the unavailable message.
+- Daily ingestion and authenticated regeneration now submit the published HTTP(S) article URL to Kagi; local extraction remains persisted independently and no longer blocks ARTICLE work.
+- Regression coverage verifies Kagi URL request shape, extraction-independent ARTICLE persistence, and rejection of non-HTTP(S) URLs. `pnpm test` (44 passed, 1 skipped), `npx tsc --noEmit`, `pnpm lint`, `pnpm test:e2e` (1 passed), `pnpm build`, and `git diff --check` passed.
+
 # Reader text selection
 
 - [x] Restore native text selection and copying for application content without changing JellyUI button interaction.
@@ -36,7 +48,7 @@
 
 ## Review — Kagi article summarization
 
-- Kagi receives only `articleSummaryInput` (the existing sanitized text), with a 1,000,000-byte guard and provider caching disabled; raw article URLs and HTML never cross the provider boundary.
+- Kagi receives a published article URL with provider caching disabled, so its document retriever can summarize pages that local text extraction cannot safely parse.
 - ARTICLE summaries persist Kagi's faithful Traditional Chinese output, token count, engine provenance, and exact-input hash; OpenAI remains limited to evidence-grounded DISCUSSION summaries.
 - Provider configuration failures and Kagi failures persist retryable ARTICLE work without preventing independent DISCUSSION work.
 - `pnpm test` (40 passed, 1 skipped), `pnpm test:e2e` (1 passed), `npx tsc --noEmit`, `pnpm lint`, `pnpm build`, and `git diff --check` passed.

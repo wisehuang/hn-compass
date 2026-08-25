@@ -29,7 +29,7 @@ export async function regenerateStorySummaries(db: Database, storyId: string) {
   const articleGenerator = config.kagiApiKey && config.kagiSummarizerEngine ? createArticleSummaryGenerator({ apiKey: config.kagiApiKey, engine: config.kagiSummarizerEngine }) : undefined;
   const discussionGenerator = config.openAiApiKey && config.openAiModel ? createDiscussionSummaryGenerator({ client: new OpenAI({ apiKey: config.openAiApiKey }), model: config.openAiModel }) : undefined;
   const jobs = [
-    ...(story.articleContent ? [{ kind: "ARTICLE", generate: () => articleGenerator ? articleGenerator.generateArticle(story.articleContent!) : Promise.reject(new Error("Kagi article summarizer is not configured.")) }] : []),
+    { kind: "ARTICLE", generate: () => articleGenerator ? articleGenerator.generateArticleFromUrl(story.articleUrl) : Promise.reject(new Error("Kagi article summarizer is not configured.")) },
     { kind: "DISCUSSION", generate: () => discussionGenerator ? discussionGenerator.generateDiscussion(story.comments.map(({ hnCommentId, bodyText }) => ({ hnCommentId, bodyText }))) : Promise.reject(new Error("OpenAI discussion summarizer is not configured.")) },
   ];
   const results = await Promise.all(jobs.map(async (job) => {
