@@ -245,5 +245,6 @@ dist
 openspec/
 
 .pnpm-store/
+tasks/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,node,nextjs,visualstudiocode,git

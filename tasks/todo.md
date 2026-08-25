@@ -1,5 +1,17 @@
 # Kagi article summarization
 
+# Prevent premature Kagi URL summary failures
+
+- [x] Add regression coverage for Kagi's non-success response diagnostics and the provider timeout budget.
+- [x] Allow Kagi URL requests enough time to complete and persist safe upstream failure diagnostics.
+- [x] Run focused and project verification; document the timeout root cause and result.
+
+## Review — Prevent premature Kagi URL summary failures
+
+- Root cause: the Kagi client imposed a 10-second timeout even though Kagi's own successful POST example reports a processing time above ten seconds. The prior implementation also collapsed HTTP status failures and timeouts into one generic error.
+- Kagi URL requests now have a 30-second timeout. Non-success responses persist their HTTP status and Kagi request ID when available; timeout failures have a distinct safe reason.
+- `pnpm vitest run tests/unit/kagi-summarizer.test.ts`, `pnpm test` (47 passed, 1 skipped), `npx tsc --noEmit`, `pnpm lint`, and `pnpm build` passed.
+
 # Accept Kagi URL summarizer response metadata
 
 - [x] Add a regression fixture for Kagi's successful URL response, including its `meta`, `title`, and `authors` fields.

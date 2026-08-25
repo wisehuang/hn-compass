@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { KAGI_MAX_TEXT_BYTES, createKagiArticleSummarizer } from "@/server/ingestion/kagi-summarizer";
+import { KAGI_MAX_TEXT_BYTES, KAGI_TIMEOUT_MS, createKagiArticleSummarizer } from "@/server/ingestion/kagi-summarizer";
 
 describe("Kagi article summarizer", () => {
   it("sends sanitized text with the Kagi privacy and Traditional Chinese options", async () => {
@@ -26,12 +26,22 @@ describe("Kagi article summarizer", () => {
     });
   });
 
-  it("rejects non-success and malformed provider responses", async () => {
-    const failing = createKagiArticleSummarizer({ apiKey: "kagi-test", engine: "agnes", fetchFn: async () => new Response("insufficient credits", { status: 402 }) });
+  it("allows Kagi enough time to complete a URL summary", () => {
+    expect(KAGI_TIMEOUT_MS).toBe(30_000);
+  });
+
+  it("reports the HTTP status and request ID for non-success provider responses", async () => {
+    const failing = createKagiArticleSummarizer({ apiKey: "kagi-test", engine: "agnes", fetchFn: async () => new Response("insufficient credits", { status: 402, headers: { "x-request-id": "kagi-request-123" } }) });
     const malformed = createKagiArticleSummarizer({ apiKey: "kagi-test", engine: "agnes", fetchFn: async () => new Response(JSON.stringify({ data: { output: "", tokens: 0 } }), { status: 200 }) });
 
-    await expect(failing("text")).rejects.toThrow("Kagi summarization failed");
+    await expect(failing("text")).rejects.toThrow("Kagi summarization failed with HTTP 402 (request ID: kagi-request-123).");
     await expect(malformed("text")).rejects.toThrow("Kagi summarization response was invalid");
+  });
+
+  it("reports when the Kagi request times out", async () => {
+    const summarize = createKagiArticleSummarizer({ apiKey: "kagi-test", engine: "agnes", fetchFn: async () => { throw new DOMException("The operation timed out.", "TimeoutError"); } });
+
+    await expect(summarize("text")).rejects.toThrow("Kagi summarization timed out.");
   });
 
   it("rejects text beyond Kagi's one-megabyte request limit before sending it", async () => {

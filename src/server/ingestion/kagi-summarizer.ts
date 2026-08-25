@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const KAGI_MAX_TEXT_BYTES = 1_000_000;
 const KAGI_SUMMARIZE_URL = "https://kagi.com/api/v0/summarize";
-const KAGI_TIMEOUT_MS = 10_000;
+export const KAGI_TIMEOUT_MS = 30_000;
 
 const KagiResponseSchema = z.object({
   data: z.object({
@@ -47,11 +47,16 @@ export function createKagiArticleSummarizer({ apiKey, engine, fetchFn = fetch }:
         body: JSON.stringify({ ...request, engine, summary_type: "summary", target_language: "ZH-HANT", cache: false }),
         signal: AbortSignal.timeout(KAGI_TIMEOUT_MS),
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") throw new Error("Kagi summarization timed out.");
       throw new Error("Kagi summarization failed.");
     }
 
-    if (!response.ok) throw new Error("Kagi summarization failed.");
+    if (!response.ok) {
+      const requestId = response.headers.get("x-request-id");
+      const requestSuffix = requestId ? ` (request ID: ${requestId})` : "";
+      throw new Error(`Kagi summarization failed with HTTP ${response.status}${requestSuffix}.`);
+    }
     const parsed = KagiResponseSchema.safeParse(await response.json().catch(() => null));
     if (!parsed.success) throw new Error("Kagi summarization response was invalid.");
     return { summary: parsed.data.data.output, tokens: parsed.data.data.tokens, targetLanguage: "ZH-HANT" };
