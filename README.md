@@ -9,13 +9,13 @@
 ```bash
 pnpm install
 cp .env.example .env.local
-# 編輯 .env.local，填入 DATABASE_URL、RSS_URL、KAGI_API_KEY、KAGI_SUMMARIZER_ENGINE、OPENAI_API_KEY、OPENAI_MODEL
+# 編輯 .env.local，填入 DATABASE_URL、RSS_URL、OPENAI_API_KEY、OPENAI_MODEL、KAGI_API_KEY、KAGI_SUMMARIZER_ENGINE
 set -a; source .env.local; set +a
 pnpm db:migrate
 pnpm dev
 ```
 
-開啟 `http://localhost:3000`。新資料庫尚沒有 digest 是正常的；執行一次 `pnpm ingest:daily` 取得並保存當日資料。完整摘要需要六個變數：`DATABASE_URL`、`RSS_URL`、`KAGI_API_KEY`、`KAGI_SUMMARIZER_ENGINE`、`OPENAI_API_KEY`、`OPENAI_MODEL`。Kagi 只產生文章摘要；OpenAI 只產生具 HN 留言證據的討論摘要。本機開發不需要 `INTERNAL_JOB_SECRET`，除非要呼叫 `/api/internal/*` 路由。
+開啟 `http://localhost:3000`。新資料庫尚沒有 digest 是正常的；執行一次 `pnpm ingest:daily` 取得並保存當日資料。完整摘要需要六個變數：`DATABASE_URL`、`RSS_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`、`KAGI_API_KEY`、`KAGI_SUMMARIZER_ENGINE`。文章摘要會逐篇路由：ingestion 先自行抽取正文並評分，分數夠高就交給 OpenAI，分數偏低或抽取失敗才改用 Kagi 的網址摘要。討論摘要一律由 OpenAI 產生，並附帶 HN 留言證據。可選的路由變數見 [docs/operations.md](docs/operations.md)。本機開發不需要 `INTERNAL_JOB_SECRET`，除非要呼叫 `/api/internal/*` 路由。
 
 在另一個 shell 先載入同一份環境變數再執行 ingestion：
 

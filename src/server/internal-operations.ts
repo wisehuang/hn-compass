@@ -1,19 +1,33 @@
-import OpenAI from "openai";
 import { eq } from "drizzle-orm";
 import type { Database } from "@/db/repositories";
 import { savePublishedSummary, saveSummaryJob } from "@/db/repositories";
 import { stories } from "@/db/schema";
-import { runDailyIngestion } from "@/server/ingestion/daily";
-import { createArticleSummaryGenerator, createDiscussionSummaryGenerator } from "@/server/ingestion/summaries";
+import { truncateSummaryInput, type ArticleFetchStatus, type ArticleMaterial } from "@/server/ingestion/article-material";
+import { createRoutedGenerator, runDailyIngestion } from "@/server/ingestion/daily";
+import type { ArticleExtractor } from "@/server/ingestion/extractors/types";
+import { readSummaryEnv } from "@/server/summary-config";
 
 function taipeiDate() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 function configuration() {
-  const { RSS_URL: rssUrl, OPENAI_API_KEY: openAiApiKey, OPENAI_MODEL: openAiModel, KAGI_API_KEY: kagiApiKey, KAGI_SUMMARIZER_ENGINE: kagiSummarizerEngine } = process.env;
+  const rssUrl = process.env.RSS_URL;
   if (!rssUrl) throw new Error("Internal operation is not configured.");
-  return { rssUrl, openAiApiKey, openAiModel, kagiApiKey, kagiSummarizerEngine };
+  return { rssUrl, ...readSummaryEnv() };
+}
+
+/** Rebuilds summarization material from the persisted row so a rerun never refetches the article. */
+function storedMaterial(story: { articleUrl: string; articleFetchStatus: string; articleContent: string | null; articleContentHash: string | null; articleExtractor: string | null; articleExtractionConfidence: number | null }): ArticleMaterial {
+  return {
+    sourceUrl: story.articleUrl,
+    articleFetchStatus: story.articleFetchStatus as ArticleFetchStatus,
+    articleContent: story.articleContent,
+    articleContentHash: story.articleContentHash,
+    articleSummaryInput: story.articleContent ? truncateSummaryInput(story.articleContent) : null,
+    articleExtractor: story.articleExtractor as ArticleExtractor | null,
+    articleExtractionConfidence: story.articleExtractionConfidence,
+  };
 }
 
 export async function ingestDaily(db: Database) {
@@ -26,11 +40,10 @@ export async function regenerateStorySummaries(db: Database, storyId: string) {
   const story = await db.query.stories.findFirst({ where: eq(stories.id, storyId), with: { comments: true } });
   if (!story) return { regenerated: false, reason: "not_found" };
   const config = configuration();
-  const articleGenerator = config.kagiApiKey && config.kagiSummarizerEngine ? createArticleSummaryGenerator({ apiKey: config.kagiApiKey, engine: config.kagiSummarizerEngine }) : undefined;
-  const discussionGenerator = config.openAiApiKey && config.openAiModel ? createDiscussionSummaryGenerator({ client: new OpenAI({ apiKey: config.openAiApiKey }), model: config.openAiModel }) : undefined;
+  const generator = createRoutedGenerator({ ...config, digestDate: "", rssUrl: config.rssUrl });
   const jobs = [
-    { kind: "ARTICLE", generate: () => articleGenerator ? articleGenerator.generateArticleFromUrl(story.articleUrl) : Promise.reject(new Error("Kagi article summarizer is not configured.")) },
-    { kind: "DISCUSSION", generate: () => discussionGenerator ? discussionGenerator.generateDiscussion(story.comments.map(({ hnCommentId, bodyText }) => ({ hnCommentId, bodyText }))) : Promise.reject(new Error("OpenAI discussion summarizer is not configured.")) },
+    { kind: "ARTICLE", generate: () => generator.generateArticle(storedMaterial(story)) },
+    { kind: "DISCUSSION", generate: () => generator.generateDiscussion(story.comments.map(({ hnCommentId, bodyText }) => ({ hnCommentId, bodyText }))) },
   ];
   const results = await Promise.all(jobs.map(async (job) => {
     try {

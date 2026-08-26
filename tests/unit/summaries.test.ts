@@ -32,7 +32,7 @@ describe("summary schemas", () => {
     await expect(generateArticleFromUrl?.("https://example.test/article")).resolves.toMatchObject({
       payload: { summary: "Kagi 直接摘要文章網址。", tokens: 120, targetLanguage: "ZH-HANT" },
     });
-    expect(JSON.parse(String(fetchFn.mock.calls[0][1]?.body))).toMatchObject({ url: "https://example.test/article", engine: "agnes", cache: false });
+    expect(JSON.parse(String(fetchFn.mock.calls[0][1]?.body))).toMatchObject({ url: "https://example.test/article", engine: "agnes", cache: true });
   });
 
   it("rejects discussion viewpoints that cite comments not persisted for the story", () => {

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, real, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -19,7 +19,8 @@ export const stories = pgTable("stories", {
   rank: integer("rank").notNull(), title: text("title").notNull(), articleUrl: text("article_url").notNull(),
   sourceDomain: text("source_domain").notNull(), hnItemId: integer("hn_item_id").notNull().unique(),
   hnDiscussionUrl: text("hn_discussion_url").notNull(), articleFetchStatus: text("article_fetch_status").notNull(),
-  articleContent: text("article_content"), articleContentHash: text("article_content_hash"), ...timestamps,
+  articleContent: text("article_content"), articleContentHash: text("article_content_hash"),
+  articleExtractor: text("article_extractor"), articleExtractionConfidence: real("article_extraction_confidence"), ...timestamps,
 }, (table) => [unique("stories_digest_rank_unique").on(table.digestId, table.rank), index("stories_digest_index").on(table.digestId)]);
 
 export const comments = pgTable("comments", {

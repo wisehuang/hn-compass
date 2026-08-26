@@ -44,7 +44,7 @@ export function createKagiArticleSummarizer({ apiKey, engine, fetchFn = fetch }:
       response = await fetchFn(KAGI_SUMMARIZE_URL, {
         method: "POST",
         headers: { Authorization: `Bot ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...request, engine, summary_type: "summary", target_language: "ZH-HANT", cache: false }),
+        body: JSON.stringify({ ...request, engine, summary_type: "summary", target_language: "ZH-HANT", cache: true }),
         signal: AbortSignal.timeout(KAGI_TIMEOUT_MS),
       });
     } catch (error) {

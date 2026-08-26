@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/db/client";
 import { comments, digests, ingestionRuns, stories, summaries, summaryJobs } from "@/db/schema";
 
@@ -13,7 +13,7 @@ export async function upsertDigest(db: Database, digestDate: string, sourceRssUr
   return digest;
 }
 
-export async function upsertStory(db: Database, values: { digestId: string; rank: number; title: string; articleUrl: string; sourceDomain: string; hnItemId: number; hnDiscussionUrl: string; articleFetchStatus: string; articleContent: string | null; articleContentHash: string | null }) {
+export async function upsertStory(db: Database, values: { digestId: string; rank: number; title: string; articleUrl: string; sourceDomain: string; hnItemId: number; hnDiscussionUrl: string; articleFetchStatus: string; articleContent: string | null; articleContentHash: string | null; articleExtractor: string | null; articleExtractionConfidence: number | null }) {
   const [story] = await db.insert(stories).values(values).onConflictDoUpdate({ target: [stories.digestId, stories.rank], set: { ...values, updatedAt: new Date() } }).returning();
   return story;
 }
@@ -46,6 +46,11 @@ export async function saveSummaryJob(db: Database, values: { storyId: string; ki
 export async function savePublishedSummary(db: Database, values: { storyId: string; kind: string; payloadJson: unknown; model: string; promptVersion: string; inputHash: string }) {
   await db.insert(summaries).values(values).onConflictDoUpdate({ target: [summaries.storyId, summaries.kind], set: { ...values, generatedAt: new Date() } });
   await saveSummaryJob(db, { storyId: values.storyId, kind: values.kind, status: "PUBLISHED" });
+}
+
+/** Lets a repeated article reuse a published summary instead of paying a provider again. */
+export async function findSummaryByInputHash(db: Database, kind: string, inputHash: string) {
+  return db.query.summaries.findFirst({ where: and(eq(summaries.kind, kind), eq(summaries.inputHash, inputHash)) });
 }
 
 export async function startIngestionRun(db: Database, digestDate: string) {

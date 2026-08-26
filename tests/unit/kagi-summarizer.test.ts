@@ -10,7 +10,7 @@ describe("Kagi article summarizer", () => {
     expect(fetchFn).toHaveBeenCalledWith("https://kagi.com/api/v0/summarize", expect.objectContaining({
       method: "POST",
       headers: { Authorization: "Bot kagi-test", "Content-Type": "application/json" },
-      body: JSON.stringify({ text: "clean article text", engine: "agnes", summary_type: "summary", target_language: "ZH-HANT", cache: false }),
+      body: JSON.stringify({ text: "clean article text", engine: "agnes", summary_type: "summary", target_language: "ZH-HANT", cache: true }),
     }));
   });
 
