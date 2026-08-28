@@ -7,6 +7,7 @@ const MAX_TOP_LEVEL_COMMENTS = 40;
 const MAX_DIRECT_REPLIES = 2;
 const MAX_CONCURRENCY = 5;
 const MINIMUM_BODY_LENGTH = 20;
+const FIREBASE_TIMEOUT_MS = 10_000;
 
 const HnItemSchema = z.object({
   id: z.number().int().positive(),
@@ -64,20 +65,15 @@ function toValidComment(item: unknown, parentHnCommentId: number | null, positio
 }
 
 async function fetchFirebaseItem(itemId: number): Promise<unknown> {
-  const response = await fetch(`${FIREBASE_ITEM_URL}/${itemId}.json`, { cache: "no-store" });
+  const response = await fetch(`${FIREBASE_ITEM_URL}/${itemId}.json`, { cache: "no-store", signal: AbortSignal.timeout(FIREBASE_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`Firebase item ${itemId} could not be fetched.`);
   return response.json();
 }
 
+/** Results stay in request order; pLimit keeps the requests in flight bounded without batch barriers. */
 async function fetchInBatches<T>(ids: number[], fetchItem: (itemId: number) => Promise<T>): Promise<Array<T | undefined>> {
   const limit = pLimit(MAX_CONCURRENCY);
-  const results: Array<T | undefined> = [];
-  for (let start = 0; start < ids.length; start += MAX_CONCURRENCY) {
-    const batch = ids.slice(start, start + MAX_CONCURRENCY);
-    const batchResults = await Promise.all(batch.map((id) => limit(() => fetchItem(id).catch(() => undefined))));
-    results.push(...batchResults);
-  }
-  return results;
+  return Promise.all(ids.map((id) => limit(() => fetchItem(id).catch(() => undefined))));
 }
 
 export async function collectHnComments(storyHnItemId: number, dependencies: Dependencies = {}): Promise<CommentCollection> {

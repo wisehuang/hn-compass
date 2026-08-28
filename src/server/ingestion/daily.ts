@@ -1,10 +1,11 @@
 import OpenAI from "openai";
+import pLimit from "p-limit";
 import { createDatabase } from "@/db/client";
 import { finishIngestionRun, findSummaryByInputHash, replaceStoryComments, savePublishedSummary, saveSummaryJob, startIngestionRun, upsertDigest, upsertStory } from "@/db/repositories";
 import { createArticleSummaryRouter, type ArticleSummaryProvider } from "@/server/ingestion/article-summary-router";
 import { resolveArticleMaterial, type ArticleMaterial } from "@/server/ingestion/article-material";
 import { collectHnComments, type CollectedHnComment } from "@/server/ingestion/hn-comments";
-import { parseDailyRss } from "@/server/ingestion/rss";
+import { parseDailyRss, type RssStory } from "@/server/ingestion/rss";
 import { createDiscussionSummaryGenerator, type ArticleSummary, type GeneratedSummary } from "@/server/ingestion/summaries";
 
 type Database = ReturnType<typeof createDatabase>["db"];
@@ -20,6 +21,12 @@ export type DailyDependencies = { fetchRss(url: string): Promise<string>; resolv
 
 const PROVIDER_METRIC: Record<ArticleSummaryProvider, "articleSummariesOpenAi" | "articleSummariesKagi" | "articleSummariesCached"> = { openai: "articleSummariesOpenAi", kagi: "articleSummariesKagi", cache: "articleSummariesCached" };
 
+/** Each story costs a fetch, a comment crawl, and two provider calls, so a few run at once without flooding any upstream. */
+const STORY_CONCURRENCY = 3;
+
+type DiscussableStory = RssStory & { hnItemId: number; hnDiscussionUrl: string };
+function isDiscussable(entry: RssStory): entry is DiscussableStory { return Boolean(entry.hnItemId && entry.hnDiscussionUrl); }
+
 async function fetchRss(url: string) { const response = await fetch(url, { signal: AbortSignal.timeout(10_000) }); if (!response.ok) throw new Error("RSS feed could not be fetched."); return response.text(); }
 function safeError(error: unknown) { return error instanceof Error ? error.message.slice(0, 200) : "Unknown ingestion failure."; }
 
@@ -27,8 +34,7 @@ export async function runDailyIngestionWith(store: DailyStore, config: DailyConf
   const run = await store.startRun(config.digestDate); const metrics = { storiesProcessed: 0, storyFailures: 0, summaryFailures: 0, articleSummariesOpenAi: 0, articleSummariesKagi: 0, articleSummariesCached: 0 };
   try {
     const digest = await store.upsertDigest(config.digestDate, config.rssUrl); const generator = dependencies.createGenerator();
-    for (const entry of parseDailyRss(await dependencies.fetchRss(config.rssUrl))) {
-      if (!entry.hnItemId || !entry.hnDiscussionUrl) continue;
+    const ingestStory = async (entry: DiscussableStory) => {
       try {
         const material = await dependencies.resolveArticle(entry.articleUrl, entry.title);
         const story = await store.upsertStory({ digestId: digest.id, rank: entry.rank, title: entry.title, articleUrl: entry.articleUrl, sourceDomain: new URL(entry.articleUrl).hostname, hnItemId: entry.hnItemId, hnDiscussionUrl: entry.hnDiscussionUrl, articleFetchStatus: material.articleFetchStatus, articleContent: material.articleContent, articleContentHash: material.articleContentHash, articleExtractor: material.articleExtractor, articleExtractionConfidence: material.articleExtractionConfidence });
@@ -40,7 +46,9 @@ export async function runDailyIngestionWith(store: DailyStore, config: DailyConf
         await Promise.all(jobs.map(async (job) => { try { const output = await job.run(); await store.savePublished({ storyId: story.id, kind: job.kind, payloadJson: output.payload, model: output.model, promptVersion: output.promptVersion, inputHash: output.inputHash }); } catch (error) { metrics.summaryFailures += 1; await store.saveFailure(story.id, job.kind, safeError(error)); } }));
         metrics.storiesProcessed += 1;
       } catch { metrics.storyFailures += 1; }
-    }
+    };
+    const limit = pLimit(STORY_CONCURRENCY);
+    await Promise.all(parseDailyRss(await dependencies.fetchRss(config.rssUrl)).filter(isDiscussable).map((entry) => limit(() => ingestStory(entry))));
     const status = metrics.storyFailures || metrics.summaryFailures ? "PARTIAL_FAILURE" : "COMPLETED"; await store.finishRun(run.id, status, metrics); return { status, metrics };
   } catch (error) { await store.finishRun(run.id, "FAILED", metrics, safeError(error)); throw error; }
 }

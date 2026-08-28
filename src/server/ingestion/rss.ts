@@ -17,6 +17,15 @@ export function extractCanonicalHnItemId(value: string): number | undefined {
   } catch { return undefined; }
 }
 
+/** Keeps `javascript:` and other active schemes out of the database, since story URLs are rendered as links. */
+export function toSafeHttpUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? value : undefined;
+  } catch { return undefined; }
+}
+
 function parseDescription(description: string): RssStory[] {
   const $ = load(description);
   const discussions = $(".postlink a").map((_, element) => {
@@ -25,7 +34,7 @@ function parseDescription(description: string): RssStory[] {
     return hnItemId && href ? { href, hnItemId } : undefined;
   }).get();
   return $(".storylink a").map((index, element) => {
-    const articleUrl = $(element).attr("href");
+    const articleUrl = toSafeHttpUrl($(element).attr("href"));
     const title = $(element).text().trim();
     if (!articleUrl || !title) return undefined;
     const discussion = discussions[index];

@@ -18,9 +18,12 @@ export async function upsertStory(db: Database, values: { digestId: string; rank
   return story;
 }
 
+/** Delete and insert share one transaction so a failure mid-replace never leaves a story with no comments. */
 export async function replaceStoryComments(db: Database, storyId: string, values: Array<{ hnCommentId: number; parentHnCommentId: number | null; author: string | null; score: number | null; bodyText: string; position: number; fetchedAt: Date }>) {
-  await db.delete(comments).where(eq(comments.storyId, storyId));
-  if (values.length) await db.insert(comments).values(values.map((comment) => ({ ...comment, storyId, isDeleted: false })));
+  await db.transaction(async (tx) => {
+    await tx.delete(comments).where(eq(comments.storyId, storyId));
+    if (values.length) await tx.insert(comments).values(values.map((comment) => ({ ...comment, storyId, isDeleted: false })));
+  });
 }
 
 export async function getLatestDigest(db: Database) {

@@ -18,8 +18,9 @@ export type PublicStory = {
 export type PublicDigest = { id: string; digestDate: string; sourceRssUrl: string; stories: PublicStory[] };
 
 type StoredComment = PublicStory["comments"][number] & { fetchedAt: Date; isDeleted: boolean };
-type StoredSummary = PublicStory["summaries"][number] & { inputHash: string };
-type StoredStory = Omit<PublicStory, "comments" | "summaries"> & { articleContent: string | null; articleContentHash: string | null; comments: StoredComment[]; summaries: StoredSummary[] };
+type StoredSummary = PublicStory["summaries"][number] & { inputHash?: string };
+/** Article text and private hashes are excluded by the queries below; they stay optional so the projection can still strip them. */
+type StoredStory = Omit<PublicStory, "comments" | "summaries"> & { articleContent?: string | null; articleContentHash?: string | null; comments: StoredComment[]; summaries: StoredSummary[] };
 type StoredDigest = Omit<PublicDigest, "stories"> & { stories: StoredStory[] };
 
 function toPublicDigest(digest: StoredDigest | null): PublicDigest | null {
@@ -33,18 +34,28 @@ function toPublicDigest(digest: StoredDigest | null): PublicDigest | null {
   })) };
 }
 
+/** Article bodies run to tens of thousands of characters each and are never part of the response. */
+const withoutPrivateStoryColumns = { articleContent: false, articleContentHash: false } as const;
+const withoutPrivateSummaryColumns = { inputHash: false } as const;
+
 export function createPublicDigestQueries(db: Database) {
   const loadDigest = async (where?: SQL) => db.query.digests.findFirst({
     where,
     orderBy: [desc(digests.digestDate)],
-    with: { stories: { orderBy: [stories.rank], with: { comments: { orderBy: (comments, { asc }) => [asc(comments.position)] }, summaries: true } } },
+    with: {
+      stories: {
+        orderBy: [stories.rank],
+        columns: withoutPrivateStoryColumns,
+        with: { comments: { orderBy: (comments, { asc }) => [asc(comments.position)] }, summaries: { columns: withoutPrivateSummaryColumns } },
+      },
+    },
   });
 
   return {
     async latest(): Promise<PublicDigest | null> { return toPublicDigest(await loadDigest() as StoredDigest | null); },
     async byDate(digestDate: string): Promise<PublicDigest | null> { return toPublicDigest(await loadDigest(eq(digests.digestDate, digestDate)) as StoredDigest | null); },
     async story(storyId: string): Promise<PublicStory | null> {
-      const story = await db.query.stories.findFirst({ where: eq(stories.id, storyId), with: { comments: true, summaries: true } });
+      const story = await db.query.stories.findFirst({ where: eq(stories.id, storyId), columns: withoutPrivateStoryColumns, with: { comments: true, summaries: { columns: withoutPrivateSummaryColumns } } });
       if (!story) return null;
       return toPublicDigest({ id: "", digestDate: "", sourceRssUrl: "", stories: [story as StoredStory] })?.stories[0] ?? null;
     },

@@ -1,7 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
-import { createInternalPostHandler, createPublicGetHandler } from "@/server/http";
+import { createInternalPostHandler, createPublicGetHandler, isUuid, PUBLIC_CACHE_CONTROL } from "@/server/http";
+
+describe("route identifiers", () => {
+  it("accepts canonical UUIDs and rejects anything Postgres would fail to cast", () => {
+    expect(isUuid("3f1b8a2c-9d4e-4f6a-9b3c-2e5d7a1c8b04")).toBe(true);
+    for (const value of ["", "not-a-uuid", "1; DROP TABLE stories", "3f1b8a2c9d4e4f6a9b3c2e5d7a1c8b04"]) expect(isUuid(value)).toBe(false);
+  });
+});
 
 describe("public route handlers", () => {
+  it("lets shared caches absorb repeated reads of a digest that changes once a day", async () => {
+    const found = await createPublicGetHandler(async () => ({ digestDate: "2026-08-24" }))();
+    const missing = await createPublicGetHandler(async () => null)();
+
+    expect(found.headers.get("cache-control")).toBe(PUBLIC_CACHE_CONTROL);
+    expect(missing.headers.get("cache-control")).toBeNull();
+  });
+
   it("returns the standard safe 404 envelope for absent or invalid resources", async () => {
     const missing = await createPublicGetHandler(async () => null)();
     const invalid = await createPublicGetHandler(async () => null)();
@@ -20,6 +35,16 @@ describe("public route handlers", () => {
     expect(await response.json()).toEqual({ error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred." } });
     expect(log).toHaveBeenCalledWith(expect.stringContaining('"status":500'));
     expect(log).not.toHaveBeenCalledWith(expect.stringContaining("secret"));
+  });
+
+  it("records the error type and throw site so production failures stay diagnosable", async () => {
+    const log = vi.fn();
+    await createPublicGetHandler(async () => { throw new TypeError("postgres://user:secret@host/db"); }, log)();
+
+    const record = JSON.parse(log.mock.calls[0][0]);
+    expect(record.errorName).toBe("TypeError");
+    expect(record.errorFrame).toContain("tests/unit/http-routes.test.ts");
+    expect(record.errorFrame).not.toContain(process.cwd());
   });
 });
 

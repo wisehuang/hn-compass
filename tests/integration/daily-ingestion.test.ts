@@ -51,6 +51,25 @@ describe("daily ingestion", () => {
     expect(upsertStory).toHaveBeenCalledWith(expect.objectContaining({ articleExtractor: "readability", articleExtractionConfidence: 0.8 }));
   });
 
+  it("processes stories concurrently without exceeding the ingestion concurrency limit", async () => {
+    const f = fixture();
+    let inFlight = 0;
+    let peakInFlight = 0;
+    f.deps.resolveArticle = async (url) => {
+      inFlight += 1;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return { sourceUrl: url, articleFetchStatus: "SUCCESS", articleContent: "x", articleContentHash: "h", articleSummaryInput: "x", articleExtractor: "readability", articleExtractionConfidence: 0.8 };
+    };
+
+    const result = await runDailyIngestionWith(f.store, config, f.deps);
+
+    expect(result.metrics.storiesProcessed).toBe(2);
+    expect(peakInFlight).toBeGreaterThan(1);
+    expect(peakInFlight).toBeLessThanOrEqual(3);
+  });
+
   it("counts article summaries per provider so Kagi spend is visible in run metrics", async () => {
     const f = fixture();
     f.deps.createGenerator = () => ({

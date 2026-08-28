@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MAX_SUMMARY_INPUT_CHARS, resolveArticleMaterial } from "@/server/ingestion/article-material";
-import { fetchPublicArticle, htmlToPlainText } from "@/server/ingestion/article-fetcher";
+import { createPinnedLookup, fetchPublicArticle, htmlToPlainText } from "@/server/ingestion/article-fetcher";
 import { extractWithReadability } from "@/server/ingestion/extractors/readability";
 
 const publicDns = async () => ["93.184.216.34"];
@@ -17,6 +17,41 @@ describe("article fetch safety", () => {
     expect(await fetchPublicArticle("https://example.test", { resolve: publicDns, fetcher: vi.fn().mockResolvedValue(new Response("x", { headers: { "content-length": String(2 * 1024 * 1024 + 1) } })) })).toEqual({ ok: false, status: "TOO_LARGE" });
   });
   it("converts HTML to plain text", () => expect(htmlToPlainText("<p>A</p><style>x</style><p>B</p>")).toBe("AB"));
+});
+
+describe("DNS pinning", () => {
+  it("connects through a dispatcher instead of letting the socket resolve the host again", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response("<html><body><div>Short body</div></body></html>"));
+    await fetchPublicArticle("https://example.test", { resolve: publicDns, fetcher });
+
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ dispatcher: expect.anything() });
+  });
+
+  it("offers only the addresses that were already validated", () => {
+    const lookup = createPinnedLookup({ addresses: ["93.184.216.34", "2606:4700:4700::1111"] });
+
+    const all = vi.fn();
+    lookup("example.test", { all: true }, all);
+    expect(all).toHaveBeenCalledWith(null, [{ address: "93.184.216.34", family: 4 }, { address: "2606:4700:4700::1111", family: 6 }]);
+
+    const first = vi.fn();
+    lookup("example.test", {}, first);
+    expect(first).toHaveBeenCalledWith(null, "93.184.216.34", 4);
+  });
+
+  it("fails the connection when a rebind swaps the validated address for a private one", () => {
+    const callback = vi.fn();
+    createPinnedLookup({ addresses: ["127.0.0.1"] })("example.test", { all: true }, callback);
+
+    expect(callback).toHaveBeenCalledWith(expect.objectContaining({ message: "UNSAFE_URL" }), []);
+  });
+
+  it("fails the connection when no address was pinned", () => {
+    const callback = vi.fn();
+    createPinnedLookup({ addresses: [] })("example.test", { all: true }, callback);
+
+    expect(callback).toHaveBeenCalledWith(expect.objectContaining({ message: "UNSAFE_URL" }), []);
+  });
 });
 
 describe("article material", () => {

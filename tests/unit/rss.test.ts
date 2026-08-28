@@ -11,6 +11,13 @@ describe("daily RSS", () => {
     const stories = parseDailyRss("<rss><channel><item><description><![CDATA[<span class='storylink'><a href='https://example.test/a'>Article A</a></span><span class='postlink'><a href='https://news.ycombinator.com/item?id=42'>comments</a></span>]]></description></item></channel></rss>");
     expect(stories).toEqual([{ rank: 1, title: "Article A", articleUrl: "https://example.test/a", hnDiscussionUrl: "https://news.ycombinator.com/item?id=42", hnItemId: 42 }]);
   });
+
+  it("drops stories whose link is not an HTTP URL, since the link is rendered and opened directly", () => {
+    const description = "<span class='storylink'><a href='javascript:alert(1)'>Hostile</a></span><span class='postlink'><a href='https://news.ycombinator.com/item?id=42'>comments</a></span><span class='storylink'><a href='https://example.test/a'>Article A</a></span><span class='postlink'><a href='https://news.ycombinator.com/item?id=43'>comments</a></span>";
+    const stories = parseDailyRss(`<rss><channel><item><description><![CDATA[${description}]]></description></item></channel></rss>`);
+
+    expect(stories.map((story) => story.articleUrl)).toEqual(["https://example.test/a"]);
+  });
 });
 
 describe("Hacker News comment collection", () => {

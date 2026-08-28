@@ -1,10 +1,12 @@
 import { lookup as dnsLookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 import { load } from "cheerio";
+import { Agent } from "undici";
 import { extractStructuredSource } from "@/server/ingestion/extractors";
 import { extractPdfText, isPdfSource } from "@/server/ingestion/extractors/pdf";
 import { extractWithReadability } from "@/server/ingestion/extractors/readability";
 import type { ArticleExtractor, ExtractorFetch } from "@/server/ingestion/extractors/types";
+import { isPublicIp } from "@/server/ingestion/ip-safety";
 
 const MAX_REDIRECTS = 3;
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -16,24 +18,31 @@ export type ArticleFetchSuccess = { ok: true; url: string; content: string; extr
 export type ArticleFetchResult = ArticleFetchSuccess | { ok: false; status: FetchFailure };
 type Resolver = (host: string) => Promise<string[]>;
 type Dependencies = { fetcher?: typeof fetch; resolve?: Resolver };
-
-function isPublicIp(address: string): boolean {
-  if (isIP(address) === 4) {
-    const [a, b] = address.split(".").map(Number);
-    return !(a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168));
-  }
-  const normalized = address.toLowerCase();
-  return !(normalized === "::" || normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe8") || normalized.startsWith("fe9") || normalized.startsWith("fea") || normalized.startsWith("feb") || normalized.startsWith("ff"));
-}
+type SafeUrl = { url: URL; addresses: string[] };
 
 async function defaultResolve(host: string) { return (await dnsLookup(host, { all: true })).map(({ address }) => address); }
 
-async function assertSafeUrl(value: string, resolve: Resolver): Promise<URL> {
+async function assertSafeUrl(value: string, resolve: Resolver): Promise<SafeUrl> {
   const url = new URL(value);
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("UNSAFE_URL");
   const addresses = isIP(url.hostname) ? [url.hostname] : await resolve(url.hostname);
   if (!addresses.length || addresses.some((address) => !isPublicIp(address))) throw new Error("UNSAFE_URL");
-  return url;
+  return { url, addresses };
+}
+
+/**
+ * Pins the connection to the addresses `assertSafeUrl` already vetted.
+ *
+ * Without this the socket would resolve the hostname a second time, letting a hostile
+ * DNS server answer the check with a public address and the connection with a private one.
+ */
+export function createPinnedLookup(pinned: { addresses: string[] }): LookupFunction {
+  return (_hostname, options, callback) => {
+    const records = pinned.addresses.filter(isPublicIp).map((address) => ({ address, family: isIP(address) }));
+    if (!records.length) { callback(new Error("UNSAFE_URL"), []); return; }
+    if (options.all) callback(null, records);
+    else callback(null, records[0].address, records[0].family);
+  };
 }
 
 async function readLimited(response: Response): Promise<Uint8Array> {
@@ -61,14 +70,17 @@ function extractFromHtml(html: string): { content: string; extractor: ArticleExt
 
 export async function fetchPublicArticle(initialUrl: string, dependencies: Dependencies = {}): Promise<ArticleFetchResult> {
   const fetcher = dependencies.fetcher ?? fetch; const resolve = dependencies.resolve ?? defaultResolve;
+  const pinned = { addresses: [] as string[] };
+  const dispatcher = new Agent({ connect: { lookup: createPinnedLookup(pinned) } });
   let current = initialUrl;
   try {
-    const structured = await extractStructuredSource(await assertSafeUrl(current, resolve), fetcher as ExtractorFetch);
+    const structured = await extractStructuredSource((await assertSafeUrl(current, resolve)).url, fetcher as ExtractorFetch);
     if (structured) return { ok: true, url: current, content: structured.text, extractor: structured.extractor, html: null, title: structured.title };
 
     for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
-      const url = await assertSafeUrl(current, resolve);
-      const response = await fetcher(url, { redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: ACCEPT_HEADER } });
+      const { url, addresses } = await assertSafeUrl(current, resolve);
+      pinned.addresses = addresses;
+      const response = await fetcher(url, { redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: ACCEPT_HEADER }, dispatcher } as RequestInit);
       if (response.status >= 300 && response.status < 400) { const location = response.headers.get("location"); if (!location || redirects === MAX_REDIRECTS) return { ok: false, status: "UNAVAILABLE" }; current = new URL(location, url).toString(); continue; }
       if (!response.ok) return { ok: false, status: "UNAVAILABLE" };
 
@@ -90,5 +102,7 @@ export async function fetchPublicArticle(initialUrl: string, dependencies: Depen
     if (error instanceof Error && error.message === "TOO_LARGE") return { ok: false, status: "TOO_LARGE" };
     if (error instanceof DOMException && error.name === "TimeoutError") return { ok: false, status: "TIMEOUT" };
     return { ok: false, status: "UNAVAILABLE" };
+  } finally {
+    await dispatcher.destroy();
   }
 }

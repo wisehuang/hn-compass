@@ -42,7 +42,7 @@ pnpm lint && pnpm test && pnpm test:e2e && pnpm build
 Prepare one Railway project with these **three long-lived services**:
 
 1. **PostgreSQL** — add Railway PostgreSQL. Keep it private; its generated `DATABASE_URL` is the only database endpoint required by the app.
-2. **Web** — add a GitHub-repository service. Railway detects `Dockerfile`; deploy from the default branch. Its start command is the Docker default, `npm run start`. Generate a public domain after it is healthy.
+2. **Web** — add a GitHub-repository service. Railway detects `Dockerfile`; deploy from the default branch. Its start command is the Docker default, `node server.js`, which runs the Next.js standalone server as the unprivileged `node` user. Generate a public domain after it is healthy.
 3. **Cron** — add a second service from the same repository and Dockerfile. Give it the custom start command `npm run ingest:daily`, configure schedule **`0 1 * * *`**, and attach the same PostgreSQL service. Railway schedules Cron in UTC, so this is 09:00 Asia/Taipei.
 
 Set shared variables on both Web and Cron: `DATABASE_URL` (reference the private PostgreSQL variable), `RSS_URL`, `KAGI_API_KEY`, `KAGI_SUMMARIZER_ENGINE`, `OPENAI_API_KEY`, `OPENAI_MODEL`, and a newly generated `INTERNAL_JOB_SECRET`. The optional article-routing variables above may be left unset to take the defaults. Railway provides `PORT` to Web; do not set a fixed value. Cron does not need a public domain.
