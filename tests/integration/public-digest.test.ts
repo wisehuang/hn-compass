@@ -18,7 +18,8 @@ if (!database) {
     const [digest] = await db.insert(digests).values({ digestDate: "2026-08-24", sourceRssUrl: "https://example.test/rss" }).returning();
     const [story] = await db.insert(stories).values({ digestId: digest.id, rank: 1, title: "Stored story", articleUrl: "https://example.test/article", sourceDomain: "example.test", hnItemId: 12345, hnDiscussionUrl: "https://news.ycombinator.com/item?id=12345", articleFetchStatus: "SUCCESS", articleContent: "private article body", articleContentHash: "private-hash" }).returning();
     storyId = story.id;
-    await db.insert(comments).values({ storyId, hnCommentId: 99, author: "alice", score: 12, bodyText: "Useful comment", position: 1, isDeleted: false });
+    await db.insert(comments).values({ storyId, hnCommentId: 99, author: "alice", score: 12, bodyText: "Useful comment", position: 1, insiderSignal: "SELF_IDENTIFIED_INSIDER", isDeleted: false });
+    await db.insert(comments).values({ storyId, hnCommentId: 100, author: "bob", score: 3, bodyText: "Comment stored before signals existed", position: 2, isDeleted: false });
     await db.insert(summaries).values({ storyId, kind: "ARTICLE", payloadJson: { tldr: "摘要" }, model: "test", promptVersion: "v1", inputHash: "private-input-hash" });
   });
 
@@ -28,11 +29,17 @@ if (!database) {
     expect((await queries.latest())?.stories[0].title).toBe("Stored story");
     expect((await queries.byDate("2026-08-24"))?.id).toBeTruthy();
     const story = await queries.story(storyId);
-    expect(story?.comments).toHaveLength(1);
+    expect(story?.comments).toHaveLength(2);
     expect(JSON.stringify(story)).not.toContain("private article body");
     expect(JSON.stringify(story)).not.toContain("private-input-hash");
     expect(await queries.byDate("2026-08-23")).toBeNull();
     expect(await queries.story("00000000-0000-0000-0000-000000000000")).toBeNull();
+  });
+
+  it("projects the persisted insider signal and leaves pre-existing comments unsignalled", async () => {
+    const story = await queries.story(storyId);
+
+    expect(story?.comments.map((comment) => [comment.hnCommentId, comment.insiderSignal])).toEqual([[99, "SELF_IDENTIFIED_INSIDER"], [100, null]]);
   });
 
   it("projects an unavailable persisted story with its source links and no article summary", async () => {

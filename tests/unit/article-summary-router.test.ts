@@ -36,7 +36,7 @@ describe("article summary routing", () => {
 
     const result = await router.generateArticle(material({ articleExtractionConfidence: 0.8 }));
 
-    expect(result).toMatchObject({ provider: "openai", model: "openai:gpt-5.6-luna", promptVersion: "openai-article-v1", payload: { summary: "摘要內容。", tokens: 180, targetLanguage: "ZH-HANT" } });
+    expect(result).toMatchObject({ provider: "openai", model: "openai:gpt-5.6-luna", promptVersion: "openai-article-v2", payload: { summary: "摘要內容。", tokens: 180, targetLanguage: "ZH-HANT" } });
     expect(parse).toHaveBeenCalledTimes(1);
     expect(kagiFetch).not.toHaveBeenCalled();
   });
@@ -87,7 +87,7 @@ describe("article summary routing", () => {
   it("reuses a cached summary instead of calling any provider", async () => {
     const { client, parse } = openAiClient();
     const kagiFetch = kagiResponse();
-    const findCachedSummary = vi.fn(async () => ({ payload: { summary: "快取摘要。", tokens: 10, targetLanguage: "ZH-HANT" as const }, inputHash: "cached", model: "openai:gpt-5.6-luna", promptVersion: "openai-article-v1" }));
+    const findCachedSummary = vi.fn(async () => ({ payload: { summary: "快取摘要。", tokens: 10, targetLanguage: "ZH-HANT" as const }, inputHash: "cached", model: "openai:gpt-5.6-luna", promptVersion: "openai-article-v2" }));
     const router = createArticleSummaryRouter({ openAi: { client, model: "gpt-5.6-luna" }, kagi: kagiOptions(kagiFetch), findCachedSummary });
 
     await expect(router.generateArticle(material())).resolves.toMatchObject({ provider: "cache", payload: { summary: "快取摘要。" } });

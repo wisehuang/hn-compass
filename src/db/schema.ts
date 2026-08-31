@@ -26,7 +26,7 @@ export const stories = pgTable("stories", {
 export const comments = pgTable("comments", {
   id: uuid("id").defaultRandom().primaryKey(), storyId: uuid("story_id").notNull().references(() => stories.id, { onDelete: "cascade" }),
   hnCommentId: integer("hn_comment_id").notNull(), parentHnCommentId: integer("parent_hn_comment_id"), author: text("author"),
-  score: integer("score"), bodyText: text("body_text").notNull(), position: integer("position").notNull(), isDeleted: boolean("is_deleted").notNull().default(false),
+  score: integer("score"), bodyText: text("body_text").notNull(), position: integer("position").notNull(), insiderSignal: text("insider_signal"), isDeleted: boolean("is_deleted").notNull().default(false),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [unique("comments_story_hn_comment_unique").on(table.storyId, table.hnCommentId), index("comments_story_index").on(table.storyId)]);
 

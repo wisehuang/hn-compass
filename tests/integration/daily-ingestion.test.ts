@@ -5,7 +5,7 @@ const xml = "<rss><channel><item><description><![CDATA[<span class='storylink'><
 function fixture() {
   const digests = new Map<string, { id: string }>(); const stories = new Map<string, { id: string; rank: number }>(); const published: string[] = []; const runs: Array<{ status?: string; metrics?: Record<string, number> }> = [];
   const store: DailyStore = { startRun: async () => { runs.push({}); return { id: "run" }; }, finishRun: async (_id, status, metrics) => { Object.assign(runs[0], { status, metrics }); }, upsertDigest: async (date) => { const value = digests.get(date) ?? { id: "digest" }; digests.set(date, value); return value; }, upsertStory: async (value) => { const key = `${value.digestId}:${value.rank}`; const story = stories.get(key) ?? { id: `story-${value.rank}`, rank: value.rank }; stories.set(key, story); return story; }, replaceComments: async () => {}, savePublished: async (value) => { published.push(`${value.storyId}:${value.kind}`); }, saveFailure: async () => {} };
-  const deps: DailyDependencies = { fetchRss: async () => xml, resolveArticle: async (url) => { if (url.endsWith("/b")) throw new Error("article failure"); return { sourceUrl: url, articleFetchStatus: "SUCCESS", articleContent: "x", articleContentHash: "h", articleSummaryInput: "x", articleExtractor: "readability", articleExtractionConfidence: 0.8 }; }, collectComments: async (id) => ({ comments: [{ hnCommentId: id * 10, parentHnCommentId: null, author: null, score: null, bodyText: "comment", position: 0, fetchedAt: new Date() }] }), createGenerator: () => ({ generateArticle: async () => ({ payload: {}, inputHash: "a", model: "m", promptVersion: "v", provider: "openai" as const }), generateDiscussion: async () => ({ payload: {}, inputHash: "d", model: "m", promptVersion: "v" }) }) };
+  const deps: DailyDependencies = { fetchRss: async () => xml, resolveArticle: async (url) => { if (url.endsWith("/b")) throw new Error("article failure"); return { sourceUrl: url, articleFetchStatus: "SUCCESS", articleContent: "x", articleContentHash: "h", articleSummaryInput: "x", articleExtractor: "readability", articleExtractionConfidence: 0.8 }; }, collectComments: async (id) => ({ comments: [{ hnCommentId: id * 10, parentHnCommentId: null, author: null, score: null, bodyText: "comment", position: 0, insiderSignal: null, fetchedAt: new Date() }] }), createGenerator: () => ({ generateArticle: async () => ({ payload: {}, inputHash: "a", model: "m", promptVersion: "v", provider: "openai" as const }), generateDiscussion: async () => ({ payload: {}, inputHash: "d", model: "m", promptVersion: "v" }) }) };
   return { store, deps, digests, stories, published, runs };
 }
 const config = { digestDate: "2026-08-24", rssUrl: "https://rss.test", openAiModel: "test", openAiApiKey: "test" };
@@ -39,6 +39,17 @@ describe("daily ingestion", () => {
 
     expect(summarize).toHaveBeenCalledWith(expect.objectContaining({ sourceUrl: "https://example.test/a", articleFetchStatus: "UNAVAILABLE" }));
     expect(f.published).toContain("story-1:ARTICLE");
+  });
+
+  it("persists the insider signal derived for a collected comment", async () => {
+    const f = fixture();
+    const replaceComments = vi.fn(f.store.replaceComments);
+    f.store.replaceComments = replaceComments;
+    f.deps.collectComments = async (id) => ({ comments: [{ hnCommentId: id * 10, parentHnCommentId: null, author: "pg", score: null, bodyText: "Happy to answer questions about this.", position: 0, insiderSignal: "SUBMITTER", fetchedAt: new Date() }] });
+
+    await runDailyIngestionWith(f.store, config, f.deps);
+
+    expect(replaceComments).toHaveBeenCalledWith("story-1", [expect.objectContaining({ author: "pg", insiderSignal: "SUBMITTER" })]);
   });
 
   it("persists the extractor and confidence used for each story", async () => {

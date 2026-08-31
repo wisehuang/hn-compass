@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 import pLimit from "p-limit";
 import { z } from "zod";
+import { deriveInsiderSignal, type InsiderSignal } from "@/server/ingestion/insider-signals";
 
 const FIREBASE_ITEM_URL = "https://hacker-news.firebaseio.com/v0/item";
 const MAX_TOP_LEVEL_COMMENTS = 40;
@@ -28,6 +29,7 @@ export type CollectedHnComment = {
   score: number | null;
   bodyText: string;
   position: number;
+  insiderSignal: InsiderSignal | null;
   fetchedAt: Date;
 };
 
@@ -46,7 +48,7 @@ function toPlainText(html: string): string {
   return $.text().replace(/\s+/g, " ").trim();
 }
 
-function toValidComment(item: unknown, parentHnCommentId: number | null, position: number): CollectedHnComment | undefined {
+function toValidComment(item: unknown, parentHnCommentId: number | null, position: number, submitter: string | null): CollectedHnComment | undefined {
   const parsed = HnItemSchema.safeParse(item);
   if (!parsed.success || parsed.data.type !== "comment" || parsed.data.deleted || parsed.data.dead || !parsed.data.text) return undefined;
 
@@ -60,6 +62,7 @@ function toValidComment(item: unknown, parentHnCommentId: number | null, positio
     score: parsed.data.score ?? null,
     bodyText,
     position,
+    insiderSignal: deriveInsiderSignal({ bodyText, author: parsed.data.by ?? null, submitter }),
     fetchedAt: new Date(),
   };
 }
@@ -81,6 +84,7 @@ export async function collectHnComments(storyHnItemId: number, dependencies: Dep
   const story = HnItemSchema.safeParse(await fetchItem(storyHnItemId));
   if (!story.success) throw new Error("Firebase story record is malformed.");
 
+  const submitter = story.data.by ?? null;
   const topLevelIds = story.data.kids ?? [];
   const topLevelItems = await fetchInBatches(topLevelIds, fetchItem);
   const comments: CollectedHnComment[] = [];
@@ -89,7 +93,7 @@ export async function collectHnComments(storyHnItemId: number, dependencies: Dep
 
   for (let topLevelIndex = 0; topLevelIndex < topLevelItems.length && retainedTopLevelComments < MAX_TOP_LEVEL_COMMENTS; topLevelIndex += 1) {
     const topLevelItem = topLevelItems[topLevelIndex];
-    const topLevelComment = toValidComment(topLevelItem, null, topLevelIndex);
+    const topLevelComment = toValidComment(topLevelItem, null, topLevelIndex, submitter);
     if (!topLevelComment) {
       skippedCount += 1;
       continue;
@@ -109,7 +113,7 @@ export async function collectHnComments(storyHnItemId: number, dependencies: Dep
         skippedCount += 1;
         continue;
       }
-      const reply = toValidComment(replyItem, topLevelComment.hnCommentId, replyIndex);
+      const reply = toValidComment(replyItem, topLevelComment.hnCommentId, replyIndex, submitter);
       if (!reply) {
         skippedCount += 1;
         continue;

@@ -11,7 +11,7 @@ export type PublicStory = {
   hnDiscussionUrl: string;
   hnItemId: number;
   articleFetchStatus: string;
-  comments: Array<{ hnCommentId: number; parentHnCommentId: number | null; author: string | null; score: number | null; bodyText: string; position: number }>;
+  comments: Array<{ hnCommentId: number; parentHnCommentId: number | null; author: string | null; score: number | null; bodyText: string; position: number; insiderSignal: string | null }>;
   summaries: Array<{ kind: string; payloadJson: unknown; model: string; promptVersion: string; generatedAt: Date }>;
 };
 
@@ -29,7 +29,7 @@ function toPublicDigest(digest: StoredDigest | null): PublicDigest | null {
     ...story,
     articleContent: undefined,
     articleContentHash: undefined,
-    comments: story.comments.filter((comment) => !comment.isDeleted).map((comment) => ({ hnCommentId: comment.hnCommentId, parentHnCommentId: comment.parentHnCommentId, author: comment.author, score: comment.score, bodyText: comment.bodyText, position: comment.position })),
+    comments: story.comments.filter((comment) => !comment.isDeleted).map((comment) => ({ hnCommentId: comment.hnCommentId, parentHnCommentId: comment.parentHnCommentId, author: comment.author, score: comment.score, bodyText: comment.bodyText, position: comment.position, insiderSignal: comment.insiderSignal })),
     summaries: story.summaries.map((summary) => ({ kind: summary.kind, payloadJson: summary.payloadJson, model: summary.model, promptVersion: summary.promptVersion, generatedAt: summary.generatedAt })),
   })) };
 }
